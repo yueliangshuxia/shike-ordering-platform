@@ -30,7 +30,7 @@ const tel = () => (shop.value.phone || '').replace(/\s/g, '')
         <div>
           <div class="foot-brand">食刻 · SHI KE</div>
           <p style="margin: 0 0 10px; max-width: 34ch">
-            现做现出的中式小馆，蒸点、小炒、烧烤、火锅一日三餐都做。
+            现做现出的港式茶餐厅，早茶点心、粥粉面、碟头小炒、糖水与奶茶，一日三餐都做。
           </p>
           <p style="margin: 0">{{ shop.address }}</p>
           <p style="margin: 6px 0 0">{{ shop.hours }}</p>
