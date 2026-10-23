@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>食刻点餐 · 现做现出，等你开饭</title>
-<meta name="description" content="食刻小馆线上点餐：蒸点、小炒、烧烤、火锅，扫码点单、实时看进度。">
+<meta name="description" content="食刻茶餐厅线上点餐：早茶点心、粥粉面、碟头小炒、糖水与丝袜奶茶，扫码点单、实时看进度。">
 <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body class="page">
@@ -19,7 +19,7 @@
       <div>
         <h1>每道菜要做多久<br>点之前就告诉你</h1>
         <p>
-          食刻是一家做蒸点、小炒、烧烤和火锅的小馆。菜是现做的，
+          食刻是一家港式茶餐厅，做早茶点心、粥粉面、碟头小炒和糖水。菜是现做的，
           所以有等待时间 —— 我们把每道菜的出餐时长都标在菜单上，
           赶时间就挑快的，不赶就慢慢等一笼小笼包。
         </p>
@@ -82,9 +82,9 @@
     </div>
     <div class="rec-band">
       <div>
-        <h2>你上次点了烧烤</h2>
+        <h2>你上次点了<span id="rec-top">点心</span></h2>
         <div class="rec-why">
-          依据：近 3 次点单里烧烤占 6 成，且未勾选「忌辣」。系统按下方权重对
+          依据：近 3 次点单里<span id="rec-top-2">点心</span>占 <span id="rec-share">4</span> 成，且未勾选「忌辣」。系统按下方权重对
           在售菜品做 TOPSIS 排序，右侧是最靠前的 5 道。
         </div>
 
@@ -165,6 +165,32 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('shop-addr').textContent = SHOP.address;
   document.getElementById('shop-hours').textContent = SHOP.hours;
   document.getElementById('shop-phone').textContent = SHOP.phone;
+
+  // 推荐示例的品类按真实订单算，别写死。
+  // 写死过一次：「你上次点了烧烤」，可菜单 2026-10-17 收敛成茶餐厅之后
+  // 订单里一条烧烤都没有，标题和订单页对不上。
+  const CAT_SHORT = { dimsum: '点心', congee: '粥粉面', stirfry: '小炒', dessert: '糖水', drink: '饮品' };
+  const recent = window.ORDERS
+    .filter(o => o.status !== '已取消')
+    .sort((a, b) => (a.time < b.time ? 1 : -1))
+    .slice(0, 3);
+  const tally = {};
+  let total = 0;
+  recent.forEach(o => o.items.forEach(it => {
+    const dish = D.find(d => d.id === it.id);
+    if (!dish) return;
+    tally[dish.cat] = (tally[dish.cat] || 0) + it.qty;
+    total += it.qty;
+  }));
+  const topCat = Object.keys(tally).sort((a, b) => tally[b] - tally[a])[0];
+  if (topCat) {
+    const name = CAT_SHORT[topCat] || topCat;
+    // 百分比换成「成」，四舍五入；至少显示 1 成，免得出现「占 0 成」
+    const share = Math.max(1, Math.round(tally[topCat] / total * 10));
+    document.getElementById('rec-top').textContent = name;
+    document.getElementById('rec-top-2').textContent = name;
+    document.getElementById('rec-share').textContent = share;
+  }
 
   // 分类入口
   document.getElementById('cat-total').textContent = onSale.length;
