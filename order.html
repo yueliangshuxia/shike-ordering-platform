@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>我的订单 · 食刻</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="page">
+
+<header data-topbar></header>
+
+<main id="main">
+  <div class="wrap-wide">
+    <nav class="crumb" aria-label="面包屑">
+      <a href="index.html">首页</a>
+      <iconify-icon icon="mdi:chevron-right" width="14" height="14"></iconify-icon>
+      <span>我的订单</span>
+    </nav>
+    <div id="order-root"></div>
+  </div>
+</main>
+
+<footer data-footer></footer>
+<div class="mobile-bar"></div>
+
+<script src="assets/vendor/iconify-icon.min.js"></script>
+<script src="assets/icons/bundle.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/layout.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const root = document.getElementById('order-root');
+  const params = new URLSearchParams(location.search);
+  const wantNo = params.get('no');
+  const isNew = params.get('new') === '1';
+
+  // 本地存的（刚下的单）排在演示数据前面
+  const mine = JSON.parse(localStorage.getItem('sk_orders_v1') || '[]');
+  const all = [...mine, ...ORDERS];
+
+  const STEPS = ['已下单', '已接单', '制作中', '已上菜', '已完成'];
+
+  /* 金额要现算：本地存的订单只记了菜品和数量，
+     价格以菜品表为准，避免菜品调价后老订单对不上。 */
+  function orderTotal(o) {
+    return o.items.reduce((s, it) => {
+      const d = SK.dishById(it.id);
+      if (!d) return s;
+      const spec = d.specs[it.specIndex || 0] || d.specs[0];
+      return s + (d.price + (spec?.delta || 0)) * it.qty;
+    }, 0);
+  }
+
+  const itemCount = (o) => o.items.reduce((s, it) => s + it.qty, 0);
+
+  /* 金额优先用下单那一刻存下来的实际值 —— 里面有自取优惠这类
+     只跟当时选择有关、事后算不出来的项。
+     data.js 里的演示订单没有这些字段，才退回按菜品现算。
+     以前一律 subtotal×1.05：结算页报 258.50 的自取单，订单详情写成 262.50。 */
+  function amountsOf(o) {
+    const sub = orderTotal(o);
+    if (typeof o.total === 'number') {
+      return {
+        sub: typeof o.subtotal === 'number' ? o.subtotal : sub,
+        service: o.serviceFee ?? 0,
+        discount: o.discount ?? 0,
+        total: o.total
+      };
+    }
+    // data.js 里的演示订单没有金额字段，退回按菜品现算。
+    // 不收服务费，所以就是小计本身
+    return { sub, service: 0, discount: 0, total: sub };
+  }
+
+  function statusPill(status) {
+    const cls = { 已下单: 'pill-hot', 制作中: 'pill-warn', 已完成: 'pill-ok', 已取消: '' }[status] || '';
+    return `<span class="pill ${cls}">${status}</span>`;
+  }
+
+  /* ---------- 单个订单的追踪详情 ---------- */
+  function renderDetail(o) {
+    const cancelled = o.status === '已取消';
+    const nowIdx = cancelled ? -1 : Math.max(0, STEPS.indexOf(o.status));
+    const amt = amountsOf(o);
+
+    return `
+      <div class="page-head">
+        <h1>${isNew ? '下单成功' : '订单详情'}</h1>
+        <p>${isNew ? '后厨已经收到你的单了' : '订单 ' + o.no}</p>
+      </div>
+
+      ${isNew ? `
+      <div class="panel" style="border-left:4px solid var(--cinnabar);display:flex;gap:22px;align-items:center;flex-wrap:wrap">
+        <img src="assets/illustrations/successful_purchase_uyin.svg" alt="" style="width:150px;flex:none">
+        <div style="flex:1;min-width:240px">
+          <h2 style="border:0;padding:0;margin-bottom:8px;font-size:var(--fs-xl)">已经送到后厨了</h2>
+          <p style="color:var(--ink-2);margin-bottom:0">
+            订单号 <strong style="font-variant-numeric:tabular-nums">${o.no}</strong>，
+            ${o.table} 桌。菜开始做了会在这里更新状态，不用一直问服务员。
+          </p>
+        </div>
+      </div>` : ''}
+
+      <div class="panel">
+        <h2>${SK.ic('mdi:map-marker-outline', 18)}进度</h2>
+
+        ${cancelled ? `
+          <div class="empty-state" style="padding:24px 0">
+            <img src="assets/illustrations/empty_xct9.svg" alt="" style="width:150px">
+            <h2 style="font-size:var(--fs-md)">这单已取消</h2>
+            <p>没有产生费用。</p>
+          </div>` : `
+          <ol class="steps">
+            ${STEPS.map((s, i) => {
+              const cls = i < nowIdx ? 'is-done' : i === nowIdx ? 'is-now' : '';
+              return `<li class="step ${cls}">
+                <span class="dot">${i < nowIdx ? SK.ic('mdi:check-circle', 13) : ''}</span>
+                ${s}
+              </li>`;
+            }).join('')}
+          </ol>
+          <p style="color:var(--ink-2);font-size:var(--fs-sm);margin:20px 0 0;text-align:center">
+            当前状态：<strong style="color:var(--cinnabar)">${o.status}</strong>
+            ${o.status !== '已完成' ? `　预计还需 ${Math.max(2, o.items.reduce((s, it) => Math.max(s, SK.dishById(it.id)?.prepMin || 0), 0))} 分钟左右` : ''}
+          </p>`}
+      </div>
+
+      <div class="two-col" style="padding-top:0">
+        <div>
+          <div class="panel">
+            <h2>${SK.ic('mdi:receipt-text-outline', 18)}菜品</h2>
+            ${o.items.map((it) => {
+              const d = SK.dishById(it.id);
+              if (!d) return '';
+              const spec = d.specs[it.specIndex || 0] || d.specs[0];
+              return `
+              <div class="mini-line">
+                <img src="${SK.img(d)}" alt="">
+                <span class="ml-name">
+                  ${SK.esc(d.name)}
+                  <span style="display:block;font-size:var(--fs-xs);color:var(--ink-3)">${SK.esc(spec?.name || '标准')}</span>
+                </span>
+                <span class="ml-qty">×${it.qty}</span>
+                <span class="ml-price">¥${SK.money((d.price + (spec?.delta || 0)) * it.qty)}</span>
+              </div>`;
+            }).join('')}
+          </div>
+
+          <div class="panel">
+            <h2>${SK.ic('mdi:information-outline', 18)}订单信息</h2>
+            <div class="summary-row"><span class="k">订单号</span><span class="v">${o.no}</span></div>
+            <div class="summary-row"><span class="k">下单时间</span><span class="v">${o.time}</span></div>
+            <div class="summary-row"><span class="k">桌号</span><span class="v">${o.table}${o.mode ? ' · ' + o.mode : ''}</span></div>
+            ${o.people ? `<div class="summary-row"><span class="k">人数</span><span class="v">${o.people} 人</span></div>` : ''}
+            <div class="summary-row"><span class="k">支付方式</span><span class="v">${o.pay}</span></div>
+            ${o.remark ? `<div class="summary-row"><span class="k">备注</span><span class="v" style="font-weight:400;text-align:right;max-width:60%">${SK.esc(o.remark)}</span></div>` : ''}
+          </div>
+        </div>
+
+        <aside class="summary-card">
+          <h2>金 额</h2>
+          <div class="summary-body">
+            <div class="summary-row"><span class="k">共 ${itemCount(o)} 件</span>
+              <span class="v">¥${SK.money(amt.sub)}</span></div>
+            ${amt.service ? `<div class="summary-row"><span class="k">服务费</span>
+              <span class="v">¥${SK.money(amt.service)}</span></div>` : ''}
+            ${amt.discount ? `<div class="summary-row"><span class="k">自提立减</span>
+              <span class="v" style="color:var(--jade)">−¥${SK.money(amt.discount)}</span></div>` : ''}
+            <div class="summary-row is-total">
+              <span class="k">实 付</span>
+              <span class="v">¥${SK.money(amt.total)}</span>
+            </div>
+            ${o.status === '已下单' ? `
+              <button class="btn btn-ghost btn-block" style="margin-top:14px" id="cancel-order">
+                ${SK.ic('mdi:close', 17)}取消订单
+              </button>` : ''}
+            <a class="btn btn-ghost btn-block" href="menu.html" style="margin-top:10px">
+              ${SK.ic('mdi:plus', 17)}再点一单
+            </a>
+          </div>
+        </aside>
+      </div>`;
+  }
+
+  /* ---------- 订单列表 ---------- */
+  function renderList() {
+    return `
+      <div class="page-head">
+        <h1>我的订单</h1>
+        <p>共 ${all.length} 单</p>
+      </div>
+
+      ${all.map((o) => `
+        <div class="order-card">
+          <div class="order-card-head">
+            <iconify-icon icon="mdi:receipt-text-outline" width="16" height="16"></iconify-icon>
+            <span class="order-no">${o.no}</span>
+            ${statusPill(o.status)}
+            <span class="order-time">${o.time}</span>
+          </div>
+          <div class="order-card-body">
+            ${o.items.slice(0, 3).map((it) => {
+              const d = SK.dishById(it.id);
+              if (!d) return '';
+              return `
+              <div class="mini-line">
+                <img src="${SK.img(d)}" alt="">
+                <span class="ml-name">${SK.esc(d.name)}</span>
+                <span class="ml-qty">×${it.qty}</span>
+              </div>`;
+            }).join('')}
+            ${o.items.length > 3 ? `
+              <p style="color:var(--ink-3);font-size:var(--fs-sm);margin:8px 0 0">
+                还有 ${o.items.length - 3} 道菜没展开
+              </p>` : ''}
+          </div>
+          <div class="order-card-foot">
+            <span class="order-total">
+              <span style="color:var(--ink-2);font-size:var(--fs-sm)">${o.table} 桌 · 共 ${itemCount(o)} 件　</span>
+              <strong style="color:var(--cinnabar);font-size:var(--fs-lg)">¥${SK.money(amountsOf(o).total)}</strong>
+            </span>
+            <a class="btn btn-ghost btn-sm" href="order.html?no=${encodeURIComponent(o.no)}">查看进度</a>
+            <button class="btn btn-ghost btn-sm" type="button" data-reorder="${o.no}">再来一单</button>
+          </div>
+        </div>`).join('')}
+
+      <div style="padding-bottom:60px"></div>`;
+  }
+
+  // 「再来一单」把整单菜品重新加进购物车
+  function reorder(no) {
+    const o = all.find((x) => x.no === no);
+    if (!o) return;
+    let n = 0;
+    o.items.forEach((it) => {
+      const d = SK.dishById(it.id);
+      if (d && d.stock > 0) { SK.add(it.id, it.specIndex || 0, it.qty); n += 1; }
+    });
+    SK.toast(n ? `已把 ${n} 道菜加回点单` : '这些菜都售罄了', n ? 'mdi:cart-outline' : 'mdi:close');
+    if (n) setTimeout(() => { location.href = 'cart.html'; }, 700);
+  }
+
+  // 路由：给了单号看详情，否则看列表
+  const target = wantNo ? all.find((o) => o.no === wantNo) : null;
+  root.innerHTML = target ? renderDetail(target) : renderList();
+
+  root.addEventListener('click', (e) => {
+    const ro = e.target.closest('[data-reorder]');
+    if (ro) reorder(ro.dataset.reorder);
+
+    if (e.target.closest('#cancel-order') && target) {
+      target.status = '已取消';
+      const stored = JSON.parse(localStorage.getItem('sk_orders_v1') || '[]');
+      const s = stored.find((x) => x.no === target.no);
+      if (s) { s.status = '已取消'; localStorage.setItem('sk_orders_v1', JSON.stringify(stored)); }
+      SK.toast('订单已取消', 'mdi:close');
+      root.innerHTML = renderDetail(target);
+    }
+  });
+});
+</script>
+</body>
+</html>

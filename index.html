@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>食刻点餐 · 现做现出，等你开饭</title>
+<meta name="description" content="食刻小馆线上点餐：蒸点、小炒、烧烤、火锅，扫码点单、实时看进度。">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="page">
+
+<header data-topbar></header>
+
+<main id="main">
+
+  <!-- 首屏：直接把「出餐时间透明」这个差异点摆出来 -->
+  <section class="hero">
+    <div class="wrap-wide">
+      <div>
+        <h1>每道菜要做多久<br>点之前就告诉你</h1>
+        <p>
+          食刻是一家做蒸点、小炒、烧烤和火锅的小馆。菜是现做的，
+          所以有等待时间 —— 我们把每道菜的出餐时长都标在菜单上，
+          赶时间就挑快的，不赶就慢慢等一笼小笼包。
+        </p>
+        <div class="hero-actions">
+          <a class="btn btn-primary btn-lg" href="menu.html">
+            <iconify-icon icon="mdi:silverware-fork-knife" width="19" height="19"></iconify-icon>
+            开始点菜
+          </a>
+          <a class="btn btn-ghost btn-lg" href="recommend.html">
+            <iconify-icon icon="mdi:star" width="19" height="19"></iconify-icon>
+            看推荐是怎么算的
+          </a>
+        </div>
+
+        <div class="hero-facts">
+          <div>
+            <div class="fact-value" id="fact-dish">—</div>
+            <div class="fact-label">在售菜品</div>
+          </div>
+          <div>
+            <div class="fact-value" id="fact-wait">—</div>
+            <div class="fact-label">平均出餐（分钟）</div>
+          </div>
+          <div>
+            <div class="fact-value">186</div>
+            <div class="fact-label">今日已出单</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-art">
+        <div class="hero-seal" aria-hidden="true">
+          现做
+          <br>
+          现出
+        </div>
+        <figure class="hero-photo">
+          <img src="assets/img/dishes/pexels-33623761.jpg" alt="食刻的早茶点心：虾饺、烧卖、肠粉配一壶茶">
+          <figcaption>早茶时段 · 6 号蒸炉出笼</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap-wide">
+
+    <!-- 分类入口 -->
+    <div class="sec-head">
+      <h2>今天吃什么</h2>
+      <span class="sec-note">共 <span id="cat-total">—</span> 道菜</span>
+    </div>
+    <div class="cat-cards" id="cat-cards"></div>
+
+    <!-- 推荐位：把 TOPSIS 的排序结果和理由摊开给用户看 -->
+    <div class="sec-head">
+      <h2>按你的口味算出来</h2>
+      <a class="sec-note" href="recommend.html" style="color:var(--cinnabar)">
+        完整算法演示 →
+      </a>
+    </div>
+    <div class="rec-band">
+      <div>
+        <h2>你上次点了烧烤</h2>
+        <div class="rec-why">
+          依据：近 3 次点单里烧烤占 6 成，且未勾选「忌辣」。系统按下方权重对
+          在售菜品做 TOPSIS 排序，右侧是最靠前的 5 道。
+        </div>
+
+        <div class="weight-block">
+          <div class="wb-title">评价准则权重（AHP 层次分析法求得）</div>
+          <div class="weight-list" id="weight-list"></div>
+          <div class="weight-foot" id="ahp-check"></div>
+        </div>
+
+        <a class="btn btn-ghost" href="recommend.html">
+          <iconify-icon icon="mdi:chart-line" width="17" height="17"></iconify-icon>
+          调整权重重新排序
+        </a>
+      </div>
+      <div class="rec-list" id="rec-list"></div>
+    </div>
+
+    <!-- 热销 -->
+    <div class="sec-head">
+      <h2>这会儿最多人点</h2>
+      <span class="sec-note">按近 30 天销量排</span>
+    </div>
+    <div class="dish-grid" id="hot-grid"></div>
+
+    <!-- 到店信息 -->
+    <div class="sec-head">
+      <h2>到店</h2>
+    </div>
+    <div class="stats" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:30px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:var(--r-sm);padding:26px 28px;margin-bottom:60px">
+      <div>
+        <h2 style="font-size:var(--fs-xl);margin-bottom:10px">扫码点单，也可以先点后到</h2>
+        <p style="color:var(--ink-2);margin-bottom:16px">
+          每张桌子上都贴着桌台码。扫开就是这个页面，点完直接下单，
+          后厨那边立刻出单，不用等服务员过来。
+        </p>
+        <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:9px">
+          <li style="display:flex;gap:9px;align-items:center">
+            <iconify-icon icon="mdi:map-marker-outline" width="18" height="18" style="color:var(--cinnabar)"></iconify-icon>
+            <span id="shop-addr"></span>
+          </li>
+          <li style="display:flex;gap:9px;align-items:center">
+            <iconify-icon icon="mdi:clock-outline" width="18" height="18" style="color:var(--cinnabar)"></iconify-icon>
+            <span id="shop-hours"></span>
+          </li>
+          <li style="display:flex;gap:9px;align-items:center">
+            <iconify-icon icon="mdi:phone-outline" width="18" height="18" style="color:var(--cinnabar)"></iconify-icon>
+            <span id="shop-phone"></span>
+          </li>
+        </ul>
+      </div>
+      <div style="text-align:center">
+        <img src="assets/illustrations/mobile_browsers_lib5.svg" alt="多终端适配示意" style="width:100%;max-width:330px;margin-inline:auto">
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<footer data-footer></footer>
+<div class="mobile-bar"></div>
+
+<!-- 顺序要紧：图标组件 → 图标数据 → 业务数据 → 页头页脚 → 公共逻辑 -->
+<script src="assets/vendor/iconify-icon.min.js"></script>
+<script src="assets/icons/bundle.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/layout.js"></script>
+<script src="assets/js/recommend.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const D = window.DISHES;
+  const onSale = D.filter(d => d.stock > 0);
+
+  document.getElementById('fact-dish').textContent = onSale.length;
+  const avgWait = Math.round(onSale.reduce((s, d) => s + d.prepMin, 0) / onSale.length);
+  document.getElementById('fact-wait').textContent = avgWait;
+
+  document.getElementById('shop-addr').textContent = SHOP.address;
+  document.getElementById('shop-hours').textContent = SHOP.hours;
+  document.getElementById('shop-phone').textContent = SHOP.phone;
+
+  // 分类入口
+  document.getElementById('cat-total').textContent = onSale.length;
+  document.getElementById('cat-cards').innerHTML = CATEGORIES.map(c => {
+    const n = SK.dishesOf(c, onSale).length;
+    if (!n) return '';
+    return `<a class="cat-card" href="menu.html#${c.id}">
+      <span class="cat-icon">${SK.ic(c.icon, 22)}</span>
+      <span>
+        <span class="cat-name">${c.name}</span>
+        <span class="cat-count">${n} 道</span>
+      </span>
+    </a>`;
+  }).join('');
+
+  // AHP 权重条：先算判断矩阵，再画出来。一致性检验不通过要显式说出来。
+  const ahpRes = SKR.ahp();
+  const wKeys = CRITERIA.map(c => c.key);
+  const wNames = { taste: '口味匹配', price: '价格实惠', hot: '热度口碑', wait: '出餐速度', healthy: '清淡健康' };
+  const wMax = Math.max(...ahpRes.weights);
+  document.getElementById('weight-list').innerHTML = CRITERIA.map((c, i) => `
+    <div class="weight-row">
+      <span class="w-name">${wNames[c.key]}</span>
+      <span class="w-track">
+        <span class="w-fill" style="width:${(ahpRes.weights[i] / wMax * 100).toFixed(1)}%"></span>
+      </span>
+      <span class="w-val">${ahpRes.weights[i].toFixed(3)}</span>
+    </div>`).join('');
+  document.getElementById('ahp-check').innerHTML = `
+    <iconify-icon icon="${ahpRes.pass ? 'mdi:check-circle' : 'mdi:alert-circle-outline'}"
+      width="14" height="14" style="color:${ahpRes.pass ? 'var(--jade)' : 'var(--cinnabar)'}"></iconify-icon>
+    λmax=${ahpRes.lambdaMax.toFixed(3)}　CI=${ahpRes.CI.toFixed(4)}　CR=${ahpRes.CR.toFixed(4)}
+    <span class="${ahpRes.pass ? 'is-pass' : ''}" style="margin-left:auto">
+      ${ahpRes.pass ? '一致性通过（CR&lt;0.1）' : '一致性不通过，需重调矩阵'}
+    </span>`;
+
+  // 推荐位：走真实的 AHP-TOPSIS，不是写死的顺序
+  const scored = SKR.recommend(D, USER_PROFILE).slice(0, 5);
+  document.getElementById('rec-list').innerHTML = scored.map(s => `
+    <a class="rec-item" href="dish.html?id=${s.dish.id}">
+      <span class="rec-rank">${s.rank}</span>
+      <img src="${SK.img(s.dish)}" alt="${SK.esc(s.dish.name)}" loading="lazy">
+      <span>
+        <span class="rec-name">${SK.esc(s.dish.name)}</span>
+        <span class="dish-tags" style="margin:3px 0 0">
+          <span class="tag">${s.dish.prepMin} 分钟</span>
+          <span class="tag">月售 ${s.dish.sold}</span>
+        </span>
+      </span>
+      <span class="rec-score">
+        <span class="sc">${s.closeness.toFixed(3)}</span>
+        <span class="sc-label">贴近度</span>
+      </span>
+    </a>`).join('');
+
+  // 热销
+  const hot = [...onSale].sort((a, b) => b.sold - a.sold).slice(0, 8);
+  document.getElementById('hot-grid').innerHTML = hot.map(SK.dishCard).join('');
+});
+</script>
+</body>
+</html>

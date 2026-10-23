@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>商家后台 · 食刻</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="page">
+
+<header data-topbar></header>
+
+<main id="main">
+  <div class="wrap-wide">
+    <nav class="crumb" aria-label="面包屑">
+      <a href="index.html">首页</a>
+      <iconify-icon icon="mdi:chevron-right" width="14" height="14"></iconify-icon>
+      <span>商家后台</span>
+    </nav>
+
+    <div class="page-head">
+      <h1>经营看板</h1>
+      <p>2026 年 10 月 15 日 · 数据截至今天 13:00</p>
+    </div>
+
+    <!-- 关键指标。数字由下面的脚本从 REVENUE_14D 算出来，别在 HTML 里再写一份 -->
+    <div class="stat-row">
+      <div class="stat">
+        <div class="stat-label"><iconify-icon icon="mdi:trending-up" width="16" height="16"></iconify-icon>今日营业额</div>
+        <div class="stat-value" id="stat-rev">—</div>
+        <div class="stat-delta" id="stat-rev-delta"></div>
+      </div>
+      <div class="stat">
+        <div class="stat-label"><iconify-icon icon="mdi:receipt-text-outline" width="16" height="16"></iconify-icon>今日订单</div>
+        <div class="stat-value" id="stat-orders">—</div>
+        <div class="stat-delta">
+          <iconify-icon icon="mdi:arrow-right" width="13" height="13" style="transform:rotate(-45deg)"></iconify-icon>
+          比昨日高 4.2%
+        </div>
+      </div>
+      <div class="stat">
+        <div class="stat-label"><iconify-icon icon="mdi:cash" width="16" height="16"></iconify-icon>客单价</div>
+        <div class="stat-value" id="stat-aov">—</div>
+        <div class="stat-delta">
+          <iconify-icon icon="mdi:arrow-right" width="13" height="13" style="transform:rotate(-45deg)"></iconify-icon>
+          比昨日高 1.8%
+        </div>
+      </div>
+      <div class="stat">
+        <div class="stat-label"><iconify-icon icon="mdi:table-chair" width="16" height="16"></iconify-icon>平均出餐</div>
+        <div class="stat-value">11<span style="font-size:var(--fs-md)"> 分</span></div>
+        <div class="stat-delta is-down">
+          <iconify-icon icon="mdi:arrow-right" width="13" height="13" style="transform:rotate(45deg)"></iconify-icon>
+          比昨日慢 2 分钟
+        </div>
+      </div>
+    </div>
+
+    <!-- 图表 -->
+    <div class="chart-grid">
+      <div class="chart-box">
+        <h2>近 14 天营业额</h2>
+        <p class="chart-note">10 月 2 日 — 10 月 15 日，单位：元</p>
+        <div class="chart" id="chart-revenue"></div>
+      </div>
+      <div class="chart-box">
+        <h2>分类销售占比</h2>
+        <p class="chart-note">按近 30 天销售额</p>
+        <div class="chart" id="chart-share"></div>
+      </div>
+    </div>
+
+    <div class="chart-box" style="margin-top:18px">
+      <h2>菜品销量排行</h2>
+      <p class="chart-note">近 30 天，前 10 名</p>
+      <div class="chart" id="chart-top" style="height:330px"></div>
+    </div>
+
+    <!-- 菜品管理 -->
+    <div class="sec-head">
+      <h2>菜品管理</h2>
+      <span class="sec-note" id="dish-count"></span>
+    </div>
+
+    <div class="table-wrap">
+      <table class="data" id="dish-table">
+        <thead>
+          <tr>
+            <th>菜品</th>
+            <th>分类</th>
+            <th style="text-align:right">售价</th>
+            <th style="text-align:right">月销</th>
+            <th style="text-align:right">评分</th>
+            <th style="text-align:right">出餐</th>
+            <th style="text-align:right">库存</th>
+            <th>状态</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="dish-tbody"></tbody>
+      </table>
+    </div>
+
+    <div style="height:60px"></div>
+  </div>
+</main>
+
+<footer data-footer></footer>
+<div class="mobile-bar"></div>
+
+<script src="assets/vendor/iconify-icon.min.js"></script>
+<script src="assets/icons/bundle.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/layout.js"></script>
+<script src="assets/vendor/echarts.min.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  /* ---------- 图表 ----------
+   * ECharts 默认配色是蓝紫色系，跟本站的松墨绿／朱砂不搭，
+   * 所以统一在这里覆盖掉，别用默认主题。 */
+  const INK = '#1B2621', INK3 = '#8A9691', LINE = '#DFDED7';
+  const PIN = '#1E4034', CIN = '#C4321F', GOLD = '#C08A2E', JADE = '#3E7A5E';
+
+  /* ---------- 关键指标 ----------
+   * 这几个数以前是直接写在 HTML 里的，「今日营业额 ¥8,610」在页面和
+   * REVENUE_14D 里各存了一份。折线的「日均」标签就是这么漂掉的：
+   * 线按数据画在 ¥11,174，标签还写着 ¥11,244。
+   * 改成统一从 REVENUE_14D 算，页面里只留占位。 */
+  const TODAY_ORDERS = 186;          // 演示常量，真实项目由订单表按日聚合
+  const revToday = REVENUE_14D[REVENUE_14D.length - 1].v;
+  const revYday = REVENUE_14D[REVENUE_14D.length - 2].v;
+  const revAvg = Math.round(REVENUE_14D.reduce((s, d) => s + d.v, 0) / REVENUE_14D.length);
+  const dayDiff = (revToday / revYday - 1) * 100;
+
+  document.getElementById('stat-rev').textContent = '¥' + revToday.toLocaleString();
+  document.getElementById('stat-orders').textContent = TODAY_ORDERS;
+  document.getElementById('stat-aov').textContent = '¥' + (revToday / TODAY_ORDERS).toFixed(1);
+
+  const revDelta = document.getElementById('stat-rev-delta');
+  revDelta.className = 'stat-delta' + (dayDiff < 0 ? ' is-down' : '');
+  revDelta.innerHTML = icArrow(dayDiff < 0 ? 45 : -45)
+    + `比昨日${dayDiff < 0 ? '低' : '高'} ${Math.abs(dayDiff).toFixed(1)}%`;
+
+  /* 涨跌箭头就是同一个图标转个角度，涨绿跌红由 .stat-delta / .is-down 管 */
+  function icArrow(deg) {
+    return `<iconify-icon icon="mdi:arrow-right" width="13" height="13"
+              style="transform:rotate(${deg}deg)"></iconify-icon>`;
+  }
+
+  const baseText = {
+    fontFamily: '"Noto Sans SC", "Microsoft YaHei", sans-serif',
+    color: INK3
+  };
+
+  const axisCommon = {
+    axisLine: { lineStyle: { color: LINE } },
+    axisTick: { show: false },
+    axisLabel: { color: INK3, fontSize: 11 },
+    splitLine: { lineStyle: { color: '#EFEEE9' } }
+  };
+
+  function tooltipCommon(extra) {
+    return Object.assign({
+      backgroundColor: '#FFFFFF',
+      borderColor: LINE,
+      borderWidth: 1,
+      textStyle: { color: INK, fontSize: 13, fontFamily: baseText.fontFamily },
+      padding: [9, 13],
+      extraCssText: 'box-shadow:0 6px 20px rgba(27,38,33,.12);border-radius:3px'
+    }, extra || {});
+  }
+
+  // 营业额折线
+  const rev = echarts.init(document.getElementById('chart-revenue'), null, { renderer: 'svg' });
+  rev.setOption({
+    textStyle: baseText,
+    grid: { left: 8, right: 14, top: 22, bottom: 6, containLabel: true },
+    tooltip: tooltipCommon({
+      trigger: 'axis',
+      valueFormatter: v => '¥' + v.toLocaleString()
+    }),
+    xAxis: Object.assign({ type: 'category', data: REVENUE_14D.map(d => d.d), boundaryGap: false }, axisCommon),
+    yAxis: Object.assign({ type: 'value', axisLabel: { color: INK3, fontSize: 11, formatter: v => v / 1000 + 'k' } }, axisCommon),
+    series: [{
+      type: 'line',
+      data: REVENUE_14D.map(d => d.v),
+      smooth: true,
+      symbol: 'circle',
+      symbolSize: 6,
+      lineStyle: { color: CIN, width: 2.5 },
+      itemStyle: { color: CIN, borderColor: '#fff', borderWidth: 2 },
+      areaStyle: {
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: 'rgba(196,50,31,.20)' },
+          { offset: 1, color: 'rgba(196,50,31,0)' }
+        ])
+      },
+      markLine: {
+        silent: true,
+        symbol: 'none',
+        lineStyle: { color: PIN, type: 'dashed', width: 1 },
+        label: { formatter: `日均 ¥${revAvg.toLocaleString()}`, color: PIN, fontSize: 11, position: 'insideEndTop' },
+        data: [{ yAxis: revAvg }]
+      }
+    }]
+  });
+
+  // 分类占比环形图
+  const share = echarts.init(document.getElementById('chart-share'), null, { renderer: 'svg' });
+  share.setOption({
+    textStyle: baseText,
+    color: [CIN, PIN, GOLD, JADE, '#7A8C84', '#C9B08A'],
+    tooltip: tooltipCommon({ trigger: 'item', valueFormatter: v => v + '%' }),
+    legend: {
+      bottom: 0, left: 'center',
+      icon: 'rect', itemWidth: 9, itemHeight: 9,
+      textStyle: { color: INK3, fontSize: 11, fontFamily: baseText.fontFamily }
+    },
+    series: [{
+      type: 'pie',
+      radius: ['48%', '70%'],
+      center: ['50%', '44%'],
+      avoidLabelOverlap: true,
+      itemStyle: { borderColor: '#fff', borderWidth: 2 },
+      label: { show: true, formatter: '{d}%', color: INK, fontSize: 12, fontWeight: 600 },
+      labelLine: { length: 8, length2: 8, lineStyle: { color: LINE } },
+      // 饼图认的是 {name, value}，数据源里字段叫 v，这里转一下
+      data: CAT_SHARE.map(d => ({ name: d.name, value: d.v }))
+    }]
+  });
+
+  // 销量排行条形图
+  const top10 = [...DISHES].sort((a, b) => b.sold - a.sold).slice(0, 10).reverse();
+  const topChart = echarts.init(document.getElementById('chart-top'), null, { renderer: 'svg' });
+  topChart.setOption({
+    textStyle: baseText,
+    grid: { left: 8, right: 44, top: 10, bottom: 6, containLabel: true },
+    tooltip: tooltipCommon({ trigger: 'axis', axisPointer: { type: 'shadow' } }),
+    xAxis: Object.assign({ type: 'value' }, axisCommon),
+    yAxis: Object.assign({
+      type: 'category',
+      data: top10.map(d => d.name),
+      axisLabel: { color: INK, fontSize: 12, fontFamily: baseText.fontFamily }
+    }, axisCommon, { splitLine: { show: false } }),
+    series: [{
+      type: 'bar',
+      data: top10.map(d => d.sold),
+      barWidth: '58%',
+      itemStyle: {
+        color: (p) => (p.dataIndex >= 7 ? CIN : PIN),
+        borderRadius: [0, 2, 2, 0]
+      },
+      label: { show: true, position: 'right', color: INK3, fontSize: 11, formatter: '{c}' }
+    }]
+  });
+
+  // 窗口变化时把图重绘一下，否则会跟容器尺寸对不上
+  let rt = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(rt);
+    rt = setTimeout(() => { rev.resize(); share.resize(); topChart.resize(); }, 160);
+  });
+
+  /* ---------- 菜品表格 ---------- */
+  /* 上下架和改库存之后都要重算 —— 之前只在初始化算一次，
+     把一道菜下架了，表头还写着「在售 26 道」。 */
+  function paintDishCount() {
+    const onSale = DISHES.filter(d => d.stock > 0).length;
+    document.getElementById('dish-count').textContent =
+      `共 ${DISHES.length} 道 · 在售 ${onSale} 道 · 售罄 ${DISHES.length - onSale} 道`;
+  }
+  paintDishCount();
+
+  function statusOf(d) {
+    if (d.stock === 0) return '<span class="pill pill-hot">已售罄</span>';
+    if (d.stock <= 20) return '<span class="pill pill-warn">库存偏低</span>';
+    return '<span class="pill pill-ok">在售</span>';
+  }
+
+  document.getElementById('dish-tbody').innerHTML = DISHES.map(d => `
+    <tr data-row="${d.id}">
+      <td>
+        <div class="cell-dish">
+          <img src="${SK.img(d)}" alt="">
+          <div>
+            <a href="dish.html?id=${d.id}" style="font-weight:600">${SK.esc(d.name)}</a>
+            <div style="font-size:var(--fs-xs);color:var(--ink-3)">
+              ${d.tags.length ? d.tags.join(' · ') : '—'}
+            </div>
+          </div>
+        </div>
+      </td>
+      <td style="color:var(--ink-2)">${SK.catById(d.cat)?.name || ''}</td>
+      <td style="text-align:right" class="num">
+        <input type="number" value="${d.price}" min="0" step="1" data-price="${d.id}"
+               aria-label="${SK.esc(d.name)} 售价（元）"
+               style="width:74px;padding:5px 8px;border:1px solid var(--line);border-radius:3px;
+                      text-align:right;font:inherit;font-size:var(--fs-sm)">
+      </td>
+      <td style="text-align:right" class="num">${d.sold}</td>
+      <td style="text-align:right" class="num">${d.rating}</td>
+      <td style="text-align:right" class="num">${d.prepMin} 分</td>
+      <td style="text-align:right" class="num">
+        <input type="number" value="${d.stock}" min="0" step="1" data-stock="${d.id}"
+               aria-label="${SK.esc(d.name)} 库存"
+               style="width:70px;padding:5px 8px;border:1px solid var(--line);border-radius:3px;
+                      text-align:right;font:inherit;font-size:var(--fs-sm)">
+      </td>
+      <td>${statusOf(d)}</td>
+      <td>
+        <div style="display:flex;gap:2px">
+          <button class="icon-btn" style="color:var(--ink-3)" type="button" data-edit="${d.id}" aria-label="编辑">${SK.ic('mdi:pencil-outline', 16)}</button>
+          <button class="icon-btn" style="color:var(--ink-3)" type="button" data-toggle="${d.id}" aria-label="上下架">${SK.ic('mdi:eye-outline', 16)}</button>
+        </div>
+      </td>
+    </tr>`).join('');
+
+  /* 改库存会顺带更新状态列，不用整表重画 */
+  document.getElementById('dish-tbody').addEventListener('change', (e) => {
+    const price = e.target.closest('[data-price]');
+    const stock = e.target.closest('[data-stock]');
+    if (!price && !stock) return;
+    const id = (price || stock).dataset.price || (price || stock).dataset.stock;
+    const d = SK.dishById(id);
+    if (!d) return;
+    if (price) d.price = Number(price.value);
+    if (stock) d.stock = Number(stock.value);
+    const row = document.querySelector(`tr[data-row="${id}"]`);
+    row.querySelector('td:nth-child(8)').innerHTML = statusOf(d);
+    paintDishCount();
+    SK.toast(`已更新「${d.name}」`, 'mdi:check-circle');
+  });
+
+  document.addEventListener('click', (e) => {
+    const ed = e.target.closest('[data-edit]');
+    const tg = e.target.closest('[data-toggle]');
+    if (ed) {
+      SK.toast('编辑弹窗是演示占位，正式版会做完整表单', 'mdi:information-outline');
+    } else if (tg) {
+      const d = SK.dishById(tg.dataset.toggle);
+      d.stock = d.stock === 0 ? 50 : 0;
+      const row = document.querySelector(`tr[data-row="${d.id}"]`);
+      row.querySelector('td:nth-child(7) input').value = d.stock;
+      row.querySelector('td:nth-child(8)').innerHTML = statusOf(d);
+      paintDishCount();
+      SK.toast(`「${d.name}」已${d.stock === 0 ? '下架' : '上架'}`, 'mdi:check-circle');
+    }
+  });
+});
+</script>
+</body>
+</html>

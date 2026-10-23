@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>点餐 · 食刻</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="page">
+
+<header data-topbar></header>
+
+<main id="main">
+  <div class="wrap-wide">
+
+    <nav class="crumb" aria-label="面包屑">
+      <a href="index.html">首页</a>
+      <iconify-icon icon="mdi:chevron-right" width="14" height="14"></iconify-icon>
+      <span>点餐</span>
+    </nav>
+
+    <div class="page-head" style="display:flex;align-items:flex-end;gap:20px;flex-wrap:wrap">
+      <div style="flex:1;min-width:280px">
+        <h1 id="menu-title">全部菜单</h1>
+        <p id="menu-sub">现做现出，出餐时间都标在卡片上</p>
+      </div>
+      <div class="filter-chips" id="filters">
+        <button class="spec-opt is-on" data-filter="all" type="button">全部</button>
+        <button class="spec-opt" data-filter="招牌" type="button">招牌</button>
+        <button class="spec-opt" data-filter="素食" type="button">素食</button>
+        <button class="spec-opt" data-filter="不辣" type="button">不辣</button>
+        <button class="spec-opt" data-filter="快" type="button">10 分钟内</button>
+        <button class="spec-opt" data-filter="平价" type="button">30 元以内</button>
+      </div>
+    </div>
+
+    <div class="order-layout">
+
+      <!-- 左：分类 -->
+      <aside class="cat-rail" aria-label="菜品分类">
+        <h2>分 类</h2>
+        <ul id="cat-list"></ul>
+      </aside>
+
+      <!-- 中：菜品 -->
+      <div id="dish-area"></div>
+
+      <!-- 右：点单栏，内容由 app.js 渲染 -->
+      <aside class="order-rail" id="order-rail" aria-label="我的点单"></aside>
+
+    </div>
+  </div>
+</main>
+
+<footer data-footer></footer>
+<div class="mobile-bar"></div>
+
+<script src="assets/vendor/iconify-icon.min.js"></script>
+<script src="assets/icons/bundle.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/layout.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const params = new URLSearchParams(location.search);
+  const q = (params.get('q') || '').trim();
+  const hashCat = location.hash.slice(1);
+
+  let activeFilter = 'all';
+
+  /* 一个筛选条件对应一个判断函数，加新条件只要往这张表里加一行 */
+  const FILTERS = {
+    all:  () => true,
+    招牌: (d) => d.tags.includes('招牌'),
+    素食: (d) => d.tags.includes('素食'),
+    不辣: (d) => d.spice === 0,
+    快:   (d) => d.prepMin <= 10,
+    平价: (d) => d.price <= 30
+  };
+
+  const matchQ = (d) => !q || d.name.includes(q) || d.desc.includes(q) ||
+    d.ingredients.some((i) => i.includes(q)) ||
+    (SK.catById(d.cat)?.name || '').includes(q);
+
+  function visible() {
+    return DISHES.filter((d) => FILTERS[activeFilter](d) && matchQ(d));
+  }
+
+  /* 分类竖栏。计数得跟着筛选走：筛了「素食」之后竖栏还写着「烧烤 6 道」，
+     点进去却是空的，比不显示更糟。被筛空的分类留住位置但做成灰色不可点；
+     本来就一道菜都没有的分类才整条不渲染。
+     「招牌推荐」走 SK.dishesOf，它是个虚拟分类，见 app.js 里的说明。 */
+  const dishesOf = SK.dishesOf;
+  function paintRail(list) {
+    document.getElementById('cat-list').innerHTML = CATEGORIES.map((c) => {
+      const n = dishesOf(c, list).length;
+      if (!n) {
+        if (!dishesOf(c, DISHES).length) return '';
+        return `<li><span class="cat-off">${SK.ic(c.icon, 15)}<span>${c.name}</span><span class="count">0</span></span></li>`;
+      }
+      return `<li>
+        <a href="#${c.id}"${c.id === hashCat ? ' class="is-active"' : ''}>
+          ${SK.ic(c.icon, 15)}<span>${c.name}</span><span class="count">${n}</span>
+        </a>
+      </li>`;
+    }).join('');
+  }
+
+  function render() {
+    const list = visible();
+    const grouped = CATEGORIES
+      .map((c) => ({ cat: c, dishes: dishesOf(c, list) }))
+      .filter((g) => g.dishes.length);
+
+    // 标题跟着搜索词走，让人知道当前在看什么
+    if (q) {
+      document.getElementById('menu-title').textContent = `「${q}」的搜索结果`;
+      document.getElementById('menu-sub').textContent =
+        list.length ? `找到 ${list.length} 道菜` : '没找到，换个词试试';
+    }
+
+    paintRail(list);
+
+    if (!list.length) {
+      document.getElementById('dish-area').innerHTML = `
+        <div class="empty-state">
+          <img src="assets/illustrations/empty_xct9.svg" alt="">
+          <h2>没有符合条件的菜</h2>
+          <p>试试去掉几个筛选条件${q ? '，或者换个关键词' : ''}。</p>
+          <button class="btn btn-ghost" type="button" id="reset-filter">清除筛选</button>
+        </div>`;
+      document.getElementById('reset-filter')?.addEventListener('click', () => {
+        activeFilter = 'all';
+        document.querySelectorAll('#filters .spec-opt').forEach((b) =>
+          b.classList.toggle('is-on', b.dataset.filter === 'all'));
+        location.search = '';
+      });
+      // 没有 section 可观察了，也要把上一轮的观察者断掉
+      SK.initCatRail();
+      return;
+    }
+
+    document.getElementById('dish-area').innerHTML = grouped.map((g) => `
+      <section id="${g.cat.id}" class="cat-section">
+        <div class="sec-head" style="margin-top:${g.cat.id === grouped[0].cat.id ? '0' : '40px'}">
+          <h2>${g.cat.name}</h2>
+          <span class="sec-note">${g.dishes.length} 道</span>
+        </div>
+        <div class="dish-grid">${g.dishes.map(SK.dishCard).join('')}</div>
+      </section>`).join('');
+
+    // section 是刚重建的，观察者必须重挂一遍 —— 上一轮的 section 已经不在 DOM 里，
+    // 观察者不会报错，只是再也不触发，竖栏就再也不会跟着滚动高亮。
+    SK.initCatRail();
+  }
+
+  // 点分类锚点后不让浏览器直接跳，交给 scrollIntoView 平滑滚
+  document.getElementById('cat-list').addEventListener('click', (e) => {
+    const a = e.target.closest('a[href^="#"]');
+    if (!a) return;
+    e.preventDefault();
+    const el = document.getElementById(a.getAttribute('href').slice(1));
+    if (el) {
+      const y = el.getBoundingClientRect().top + window.scrollY - 78;
+      window.scrollTo({ top: y, behavior: 'smooth' });
+      history.replaceState(null, '', a.getAttribute('href'));
+    }
+  });
+
+  // 筛选
+  document.getElementById('filters').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-filter]');
+    if (!btn) return;
+    activeFilter = btn.dataset.filter;
+    document.querySelectorAll('#filters .spec-opt')
+      .forEach((b) => b.classList.toggle('is-on', b === btn));
+    render();
+  });
+
+  render();
+
+  // 从 hash 进来时滚到对应分类（数据渲染完之后再滚，否则找不到元素）
+  if (hashCat) {
+    requestAnimationFrame(() => {
+      const el = document.getElementById(hashCat);
+      if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 78 });
+    });
+  }
+});
+</script>
+</body>
+</html>
