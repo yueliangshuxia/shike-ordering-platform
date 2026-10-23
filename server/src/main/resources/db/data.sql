@@ -1,0 +1,207 @@
+-- =====================================================================
+--  食刻点餐系统 · 演示数据（由 tools/gen_seed.mjs 自动生成，不要手改）
+--
+--  来源：demo/assets/js/data.js —— 那是唯一的数据源，改菜单请改那里再重跑：
+--      node tools/gen_seed.mjs
+--
+--  全部是 INSERT IGNORE，配合 schema.sql 的 IF NOT EXISTS，
+--  应用每次启动重跑本脚本都不会重复插入，也不会覆盖管理员改过的数据。
+--
+--  用户账号和订单<b>不在这里</b>：密码要用 BCrypt 现算，
+--  写死在 SQL 里既不好看也不安全，交给 DataInitializer 在启动时补。
+-- =====================================================================
+
+-- 分类。signature（招牌推荐）是虚拟分类，故意不插进来，
+-- 它由 DishService 在返回分类列表时拼在最前面。
+INSERT IGNORE INTO t_category (code, name, icon, sort, enabled) VALUES
+    ('dimsum', '点心蒸点', 'mdi:pot-steam', 0, 1),
+    ('congee', '粥粉面', 'mdi:noodles', 1, 1),
+    ('stirfry', '小炒碟头', 'mdi:pot-mix-outline', 2, 1),
+    ('dessert', '糖水甜品', 'mdi:ice-cream', 3, 1),
+    ('drink', '饮品', 'mdi:cup', 4, 1);
+
+-- 餐桌
+INSERT IGNORE INTO t_dining_table (code, seats, area, status, enabled) VALUES
+    ('A12', 4, '一层大厅', 'FREE', 1),
+    ('A13', 4, '一层大厅', 'FREE', 1),
+    ('B07', 6, '二层雅座', 'FREE', 1),
+    ('B08', 2, '二层雅座', 'FREE', 1),
+    ('C01', 8, '包厢', 'FREE', 1);
+
+-- 菜品。category_id 用子查询按 code 取，这样不依赖自增 id 的具体值
+INSERT IGNORE INTO t_dish (code, name, category_id, price, img, brief, detail, spice, sold, rating, prep_min, stock, unit, spec_label, enabled) VALUES
+    ('D1001', '水晶虾饺', (SELECT id FROM t_category WHERE code = 'dimsum'), 28.00, 'assets/img/dishes/pexels-38141840.jpg', '整只青虾仁，澄面皮透亮弹牙', '每只塞进三尾整虾仁，澄面加木薯粉擀成半透明皮，蒸出来能看见里面的虾。褶数要够十二道，收口捏紧才不会漏汤。蘸一点浙醋提鲜。', 0, 1286, 4.8, 10, 48, '笼', '份量', 1),
+    ('D1002', '蟹黄小笼包', (SELECT id FROM t_category WHERE code = 'dimsum'), 38.00, 'assets/img/dishes/pexels-36453292.jpg', '现包现蒸，皮薄十八褶，一口爆汤', '每日清晨现拆蟹黄拌入猪前腿肉，高汤冻打底。上笼猛火蒸六分钟即出，褶花收在顶部，提起来不破皮。吃法是先开窗、后吸汤、再蘸姜醋。', 0, 1145, 4.8, 12, 0, '笼', '份量', 1),
+    ('D1003', '韭菜蒸饺', (SELECT id FROM t_category WHERE code = 'dimsum'), 24.00, 'assets/img/dishes/pexels-27927337.jpg', '烫面皮，韭菜配鸡蛋碎，素得香', '韭菜只用中段，鸡蛋炒成细碎晾凉再拌，避免出水。烫面皮蒸后偏软糯，比水饺更适合配茶。', 0, 862, 4.5, 9, 52, '笼', '份量', 1),
+    ('D1004', '明档鲜肉包', (SELECT id FROM t_category WHERE code = 'dimsum'), 12.00, 'assets/img/dishes/pexels-17317227.jpg', '门口明档现蒸，掀开笼盖就是香', '门口蒸炉全天不停火，什么时候路过都是热的。肉馅加葱姜水和皮冻，咬开有汁。早市七点半出第一笼。', 0, 1620, 4.6, 8, 120, '个', '数量', 1),
+    ('D1005', '粤式早茶拼盘', (SELECT id FROM t_category WHERE code = 'dimsum'), 58.00, 'assets/img/dishes/pexels-33623761.jpg', '虾饺烧卖肠粉三拼，一笼吃全', '早茶时段最受欢迎的搭配：鲜虾饺两件、干蒸烧卖两件、鲜虾肠粉一条，另配一壶普洱。适合两个人分着吃。', 0, 508, 4.9, 14, 30, '份', '搭配', 1),
+    ('D2001', '鲜虾云吞面', (SELECT id FROM t_category WHERE code = 'congee'), 32.00, 'assets/img/dishes/pexels-31263150.jpg', '大地鱼熬汤，云吞里包整只虾', '汤底用大地鱼干、猪骨和虾头熬四小时，喝起来是清甜不是咸鲜。云吞现包，一只里放整尾虾仁；面用碱水细面，过冷水再回汤，才够爽。', 0, 1086, 4.7, 9, 45, '碗', '份量', 1),
+    ('D2002', '星洲炒米粉', (SELECT id FROM t_category WHERE code = 'congee'), 34.00, 'assets/img/dishes/pexels-9213853.jpg', '咖喱香配银芽，米粉根根分明', '细米粉先用温水泡软再炒，火要大、手要快，不然会坨。咖喱粉和虾米吊味，出锅前拌银芽和韭黄，保持脆口。', 2, 724, 4.6, 10, 38, '份', '份量', 1),
+    ('D2003', '姜葱捞面', (SELECT id FROM t_category WHERE code = 'congee'), 22.00, 'assets/img/dishes/pexels-31418923.jpg', '葱油现泼，拌开就是香', '姜蓉和葱花铺在面上，滚油一泼激出香味再拌。看着素，吃过的回头点得最多。加一只溏心蛋更下饭。', 0, 962, 4.4, 7, 60, '碗', '份量', 1),
+    ('D2004', '叉烧汤面', (SELECT id FROM t_category WHERE code = 'congee'), 38.00, 'assets/img/dishes/pexels-31264126.jpg', '自家烧的叉烧切片，汤头清甜', '叉烧是店里自己烧的，和烧味拼盘用的是同一炉。切片铺在汤面上，另配半只溏心蛋。汤底用猪骨和大地鱼熬，不加酱油，澄清见底。', 0, 834, 4.7, 10, 32, '碗', '份量', 1),
+    ('D2005', '艇仔粥', (SELECT id FROM t_category WHERE code = 'congee'), 20.00, 'assets/img/dishes/tinzai-congee.jpg', '鱼片猪皮花生，一碗十样料', '白粥底熬到开花，上桌前才把鲩鱼片、猪皮丝、炸花生、油条碎一样样码进去，靠粥的余温烫熟鱼片。料比粥多，是老广的吃法。', 0, 1120, 4.5, 6, 40, '碗', '份量', 1),
+    ('D3001', '避风塘炒虾', (SELECT id FROM t_category WHERE code = 'stirfry'), 68.00, 'assets/img/dishes/pexels-10201775.jpg', '蒜酥铺满，连壳都能嚼着吃', '大虾开背去线，先炸到壳脆，再和金银蒜、面包糠、干辣椒一起翻。蒜要分两次下，一半炸香一半留生，香气才有层次。', 1, 724, 4.8, 14, 26, '份', '份量', 1),
+    ('D3002', '豉油皇煎虾', (SELECT id FROM t_category WHERE code = 'stirfry'), 58.00, 'assets/img/dishes/pexels-36720618.jpg', '头抽加冰糖，壳亮得反光', '只用头抽和冰糖调汁，不加老抽，所以颜色透亮不发黑。虾下锅前剪掉长须，两面煎透再淋汁收干，汁挂在壳上才算到位。', 0, 618, 4.7, 12, 24, '份', '份量', 1),
+    ('D3003', '麻婆豆腐', (SELECT id FROM t_category WHERE code = 'stirfry'), 32.00, 'assets/img/dishes/pexels-37297770.jpg', '麻、辣、烫、香，配饭一流', '嫩豆腐先用盐水浸过，下锅才不容易碎。郫县豆瓣炒出红油，起锅前撒花椒粉。茶餐厅的碟头饭常点它，一勺豆腐能送下半碗饭。', 2, 1673, 4.6, 8, 50, '份', '辣度', 1),
+    ('D3004', '白灼时蔬', (SELECT id FROM t_category WHERE code = 'stirfry'), 26.00, 'assets/img/dishes/pexels-1640777.jpg', '当日市蔬，灼好淋豉油', '蔬菜按当日市价调整，通常有菜心、芥蓝或西兰花。滚水加一点油盐灼熟，捞起淋热豉油——这一步是把青菜做得比肉还香的关键。', 0, 486, 4.4, 6, 46, '份', '份量', 1),
+    ('D4001', '焦糖炖蛋', (SELECT id FROM t_category WHERE code = 'dessert'), 26.00, 'assets/img/dishes/pexels-34711174.jpg', '现烤焦糖壳，敲开才好吃', '蛋奶液过筛两次保证顺滑，上桌前现撒糖用喷枪烤出脆壳。壳会慢慢回软，建议五分钟内敲开。', 0, 476, 4.7, 9, 28, '份', '份量', 1),
+    ('D4002', '草莓芝士蛋糕', (SELECT id FROM t_category WHERE code = 'dessert'), 32.00, 'assets/img/dishes/pexels-30794003.jpg', '免烤芝士，草莓按季节换', '饼底用消化饼干压实，芝士层低温冷藏六小时定型。草莓只在当季用新鲜的，过季换成蓝莓或芒果。', 0, 638, 4.8, 4, 24, '块', '份量', 1),
+    ('D4003', '杨枝甘露', (SELECT id FROM t_category WHERE code = 'dessert'), 28.00, 'assets/img/dishes/mango-pomelo-sago.jpg', '芒果西柚椰浆，港式老配方', '芒果打底、西柚拆成粒、椰浆和淡奶油调匀，最后撒西米。西柚要拆干净白膜，不然会苦。', 0, 592, 4.6, 6, 26, '份', '份量', 1),
+    ('D5001', '港式丝袜奶茶', (SELECT id FROM t_category WHERE code = 'drink'), 18.00, 'assets/img/dishes/pexels-34511977.jpg', '茶胆撞奶，浓到挂杯', '锡兰红茶拼配三种粗细的茶，撞茶要撞六手才够滑。淡奶最后下，不能煮，煮了会出油。热的比冻的香，但冻的配碟头饭更顺口。', 0, 1486, 4.7, 4, 80, '杯', '冷热', 1),
+    ('D5002', '冻柠茶', (SELECT id FROM t_category WHERE code = 'drink'), 16.00, 'assets/img/dishes/iced-lemon-tea.jpg', '柠檬现切现捶，茶底清亮', '柠檬要现切现捶，捶出皮油才够香，提前捶好放一会儿会发苦。茶底比奶茶淡一档，糖浆单独上，客人自己调甜度。', 0, 1620, 4.6, 3, 90, '杯', '甜度', 1),
+    ('D5003', '菊花茶', (SELECT id FROM t_category WHERE code = 'drink'), 12.00, 'assets/img/dishes/chrysanthemum-tea.jpg', '杭白菊加冰糖，解腻', '整朵杭白菊泡开，加一小块冰糖。吃多了炸物和烧味的时候，一壶下去最舒服。可以续水两次。', 0, 684, 4.3, 2, 100, '壶', '冷热', 1);
+
+-- 标签。招牌 / 素食 / 冰饮 / 现做 —— 推荐算法里几处分支都读它
+INSERT IGNORE INTO t_dish_tag (dish_id, tag) VALUES
+    ((SELECT id FROM t_dish WHERE code = 'D1001'), '招牌'),
+    ((SELECT id FROM t_dish WHERE code = 'D1001'), '现做'),
+    ((SELECT id FROM t_dish WHERE code = 'D1002'), '招牌'),
+    ((SELECT id FROM t_dish WHERE code = 'D1002'), '现做'),
+    ((SELECT id FROM t_dish WHERE code = 'D1003'), '素食'),
+    ((SELECT id FROM t_dish WHERE code = 'D1004'), '现做'),
+    ((SELECT id FROM t_dish WHERE code = 'D1005'), '招牌'),
+    ((SELECT id FROM t_dish WHERE code = 'D2001'), '招牌'),
+    ((SELECT id FROM t_dish WHERE code = 'D2001'), '现做'),
+    ((SELECT id FROM t_dish WHERE code = 'D2002'), '现做'),
+    ((SELECT id FROM t_dish WHERE code = 'D2003'), '素食'),
+    ((SELECT id FROM t_dish WHERE code = 'D2005'), '现做'),
+    ((SELECT id FROM t_dish WHERE code = 'D3001'), '招牌'),
+    ((SELECT id FROM t_dish WHERE code = 'D3001'), '现做'),
+    ((SELECT id FROM t_dish WHERE code = 'D3002'), '现做'),
+    ((SELECT id FROM t_dish WHERE code = 'D3003'), '现做'),
+    ((SELECT id FROM t_dish WHERE code = 'D3004'), '素食'),
+    ((SELECT id FROM t_dish WHERE code = 'D4001'), '现做'),
+    ((SELECT id FROM t_dish WHERE code = 'D4002'), '冰饮'),
+    ((SELECT id FROM t_dish WHERE code = 'D4003'), '冰饮'),
+    ((SELECT id FROM t_dish WHERE code = 'D5001'), '冰饮'),
+    ((SELECT id FROM t_dish WHERE code = 'D5001'), '现做'),
+    ((SELECT id FROM t_dish WHERE code = 'D5002'), '冰饮'),
+    ((SELECT id FROM t_dish WHERE code = 'D5003'), '冰饮');
+
+-- 食材。忌口过滤的数据来源，存原文不存编码：算法做的是子串 + 别名匹配
+INSERT IGNORE INTO t_dish_ingredient (dish_id, name, sort) VALUES
+    ((SELECT id FROM t_dish WHERE code = 'D1001'), '青虾仁', 0),
+    ((SELECT id FROM t_dish WHERE code = 'D1001'), '澄面', 1),
+    ((SELECT id FROM t_dish WHERE code = 'D1001'), '木薯粉', 2),
+    ((SELECT id FROM t_dish WHERE code = 'D1001'), '笋粒', 3),
+    ((SELECT id FROM t_dish WHERE code = 'D1002'), '河蟹黄', 0),
+    ((SELECT id FROM t_dish WHERE code = 'D1002'), '猪前腿肉', 1),
+    ((SELECT id FROM t_dish WHERE code = 'D1002'), '高汤冻', 2),
+    ((SELECT id FROM t_dish WHERE code = 'D1002'), '高筋面粉', 3),
+    ((SELECT id FROM t_dish WHERE code = 'D1003'), '韭菜', 0),
+    ((SELECT id FROM t_dish WHERE code = 'D1003'), '土鸡蛋', 1),
+    ((SELECT id FROM t_dish WHERE code = 'D1003'), '中筋面粉', 2),
+    ((SELECT id FROM t_dish WHERE code = 'D1003'), '香油', 3),
+    ((SELECT id FROM t_dish WHERE code = 'D1004'), '猪前腿肉', 0),
+    ((SELECT id FROM t_dish WHERE code = 'D1004'), '中筋面粉', 1),
+    ((SELECT id FROM t_dish WHERE code = 'D1004'), '葱姜水', 2),
+    ((SELECT id FROM t_dish WHERE code = 'D1004'), '皮冻', 3),
+    ((SELECT id FROM t_dish WHERE code = 'D1005'), '青虾仁', 0),
+    ((SELECT id FROM t_dish WHERE code = 'D1005'), '猪肉', 1),
+    ((SELECT id FROM t_dish WHERE code = 'D1005'), '肠粉', 2),
+    ((SELECT id FROM t_dish WHERE code = 'D1005'), '普洱茶叶', 3),
+    ((SELECT id FROM t_dish WHERE code = 'D2001'), '青虾仁', 0),
+    ((SELECT id FROM t_dish WHERE code = 'D2001'), '猪前腿肉', 1),
+    ((SELECT id FROM t_dish WHERE code = 'D2001'), '碱水面', 2),
+    ((SELECT id FROM t_dish WHERE code = 'D2001'), '大地鱼干', 3),
+    ((SELECT id FROM t_dish WHERE code = 'D2002'), '细米粉', 0),
+    ((SELECT id FROM t_dish WHERE code = 'D2002'), '银芽', 1),
+    ((SELECT id FROM t_dish WHERE code = 'D2002'), '韭黄', 2),
+    ((SELECT id FROM t_dish WHERE code = 'D2002'), '虾米', 3),
+    ((SELECT id FROM t_dish WHERE code = 'D2002'), '咖喱粉', 4),
+    ((SELECT id FROM t_dish WHERE code = 'D2003'), '细面', 0),
+    ((SELECT id FROM t_dish WHERE code = 'D2003'), '姜', 1),
+    ((SELECT id FROM t_dish WHERE code = 'D2003'), '葱', 2),
+    ((SELECT id FROM t_dish WHERE code = 'D2003'), '花生油', 3),
+    ((SELECT id FROM t_dish WHERE code = 'D2004'), '叉烧', 0),
+    ((SELECT id FROM t_dish WHERE code = 'D2004'), '细面', 1),
+    ((SELECT id FROM t_dish WHERE code = 'D2004'), '土鸡蛋', 2),
+    ((SELECT id FROM t_dish WHERE code = 'D2004'), '猪骨', 3),
+    ((SELECT id FROM t_dish WHERE code = 'D2004'), '大地鱼干', 4),
+    ((SELECT id FROM t_dish WHERE code = 'D2005'), '鲩鱼片', 0),
+    ((SELECT id FROM t_dish WHERE code = 'D2005'), '猪皮', 1),
+    ((SELECT id FROM t_dish WHERE code = 'D2005'), '炸花生', 2),
+    ((SELECT id FROM t_dish WHERE code = 'D2005'), '油条', 3),
+    ((SELECT id FROM t_dish WHERE code = 'D2005'), '大米', 4),
+    ((SELECT id FROM t_dish WHERE code = 'D3001'), '海虾', 0),
+    ((SELECT id FROM t_dish WHERE code = 'D3001'), '蒜蓉', 1),
+    ((SELECT id FROM t_dish WHERE code = 'D3001'), '面包糠', 2),
+    ((SELECT id FROM t_dish WHERE code = 'D3001'), '干辣椒', 3),
+    ((SELECT id FROM t_dish WHERE code = 'D3002'), '海虾', 0),
+    ((SELECT id FROM t_dish WHERE code = 'D3002'), '头抽', 1),
+    ((SELECT id FROM t_dish WHERE code = 'D3002'), '冰糖', 2),
+    ((SELECT id FROM t_dish WHERE code = 'D3002'), '姜', 3),
+    ((SELECT id FROM t_dish WHERE code = 'D3003'), '嫩豆腐', 0),
+    ((SELECT id FROM t_dish WHERE code = 'D3003'), '牛肉末', 1),
+    ((SELECT id FROM t_dish WHERE code = 'D3003'), '郫县豆瓣', 2),
+    ((SELECT id FROM t_dish WHERE code = 'D3003'), '花椒', 3),
+    ((SELECT id FROM t_dish WHERE code = 'D3004'), '菜心', 0),
+    ((SELECT id FROM t_dish WHERE code = 'D3004'), '西兰花', 1),
+    ((SELECT id FROM t_dish WHERE code = 'D3004'), '蒜', 2),
+    ((SELECT id FROM t_dish WHERE code = 'D3004'), '生抽', 3),
+    ((SELECT id FROM t_dish WHERE code = 'D4001'), '土鸡蛋', 0),
+    ((SELECT id FROM t_dish WHERE code = 'D4001'), '淡奶油', 1),
+    ((SELECT id FROM t_dish WHERE code = 'D4001'), '香草荚', 2),
+    ((SELECT id FROM t_dish WHERE code = 'D4001'), '焦糖', 3),
+    ((SELECT id FROM t_dish WHERE code = 'D4002'), '奶油芝士', 0),
+    ((SELECT id FROM t_dish WHERE code = 'D4002'), '消化饼干', 1),
+    ((SELECT id FROM t_dish WHERE code = 'D4002'), '淡奶油', 2),
+    ((SELECT id FROM t_dish WHERE code = 'D4002'), '当季草莓', 3),
+    ((SELECT id FROM t_dish WHERE code = 'D4003'), '芒果', 0),
+    ((SELECT id FROM t_dish WHERE code = 'D4003'), '西柚', 1),
+    ((SELECT id FROM t_dish WHERE code = 'D4003'), '椰浆', 2),
+    ((SELECT id FROM t_dish WHERE code = 'D4003'), '西米', 3),
+    ((SELECT id FROM t_dish WHERE code = 'D5001'), '锡兰红茶', 0),
+    ((SELECT id FROM t_dish WHERE code = 'D5001'), '淡奶', 1),
+    ((SELECT id FROM t_dish WHERE code = 'D5001'), '砂糖', 2),
+    ((SELECT id FROM t_dish WHERE code = 'D5002'), '柠檬', 0),
+    ((SELECT id FROM t_dish WHERE code = 'D5002'), '锡兰红茶', 1),
+    ((SELECT id FROM t_dish WHERE code = 'D5002'), '糖浆', 2),
+    ((SELECT id FROM t_dish WHERE code = 'D5003'), '杭白菊', 0),
+    ((SELECT id FROM t_dish WHERE code = 'D5003'), '冰糖', 1);
+
+-- 规格。price_delta 是相对基准价的加价，改基础价时不用逐条改这里
+INSERT IGNORE INTO t_dish_spec (dish_id, name, price_delta, sort) VALUES
+    ((SELECT id FROM t_dish WHERE code = 'D1001'), '标准 4 只', 0.00, 0),
+    ((SELECT id FROM t_dish WHERE code = 'D1001'), '大份 8 只', 26.00, 1),
+    ((SELECT id FROM t_dish WHERE code = 'D1002'), '标准 6 只', 0.00, 0),
+    ((SELECT id FROM t_dish WHERE code = 'D1002'), '大份 10 只', 22.00, 1),
+    ((SELECT id FROM t_dish WHERE code = 'D1003'), '标准 4 只', 0.00, 0),
+    ((SELECT id FROM t_dish WHERE code = 'D1003'), '大份 8 只', 18.00, 1),
+    ((SELECT id FROM t_dish WHERE code = 'D1004'), '单个', 0.00, 0),
+    ((SELECT id FROM t_dish WHERE code = 'D1004'), '三个', 22.00, 1),
+    ((SELECT id FROM t_dish WHERE code = 'D1005'), '双人份', 0.00, 0),
+    ((SELECT id FROM t_dish WHERE code = 'D1005'), '四人份', 46.00, 1),
+    ((SELECT id FROM t_dish WHERE code = 'D2001'), '标准', 0.00, 0),
+    ((SELECT id FROM t_dish WHERE code = 'D2001'), '加面', 6.00, 1),
+    ((SELECT id FROM t_dish WHERE code = 'D2002'), '标准', 0.00, 0),
+    ((SELECT id FROM t_dish WHERE code = 'D2002'), '大份', 12.00, 1),
+    ((SELECT id FROM t_dish WHERE code = 'D2003'), '标准', 0.00, 0),
+    ((SELECT id FROM t_dish WHERE code = 'D2003'), '加溏心蛋', 5.00, 1),
+    ((SELECT id FROM t_dish WHERE code = 'D2004'), '标准', 0.00, 0),
+    ((SELECT id FROM t_dish WHERE code = 'D2004'), '加叉烧', 16.00, 1),
+    ((SELECT id FROM t_dish WHERE code = 'D2005'), '标准', 0.00, 0),
+    ((SELECT id FROM t_dish WHERE code = 'D2005'), '大份', 8.00, 1),
+    ((SELECT id FROM t_dish WHERE code = 'D3001'), '标准', 0.00, 0),
+    ((SELECT id FROM t_dish WHERE code = 'D3001'), '大份', 24.00, 1),
+    ((SELECT id FROM t_dish WHERE code = 'D3002'), '标准', 0.00, 0),
+    ((SELECT id FROM t_dish WHERE code = 'D3002'), '大份', 22.00, 1),
+    ((SELECT id FROM t_dish WHERE code = 'D3003'), '微辣', 0.00, 0),
+    ((SELECT id FROM t_dish WHERE code = 'D3003'), '中辣', 0.00, 1),
+    ((SELECT id FROM t_dish WHERE code = 'D3004'), '标准', 0.00, 0),
+    ((SELECT id FROM t_dish WHERE code = 'D3004'), '大份', 10.00, 1),
+    ((SELECT id FROM t_dish WHERE code = 'D4001'), '单份', 0.00, 0),
+    ((SELECT id FROM t_dish WHERE code = 'D4001'), '双份', 20.00, 1),
+    ((SELECT id FROM t_dish WHERE code = 'D4002'), '单块', 0.00, 0),
+    ((SELECT id FROM t_dish WHERE code = 'D4002'), '双人份 2 块', 26.00, 1),
+    ((SELECT id FROM t_dish WHERE code = 'D4003'), '单份', 0.00, 0),
+    ((SELECT id FROM t_dish WHERE code = 'D4003'), '大份', 12.00, 1),
+    ((SELECT id FROM t_dish WHERE code = 'D5001'), '热', 0.00, 0),
+    ((SELECT id FROM t_dish WHERE code = 'D5001'), '冻', 2.00, 1),
+    ((SELECT id FROM t_dish WHERE code = 'D5002'), '标准甜', 0.00, 0),
+    ((SELECT id FROM t_dish WHERE code = 'D5002'), '少糖', 0.00, 1),
+    ((SELECT id FROM t_dish WHERE code = 'D5003'), '热', 0.00, 0),
+    ((SELECT id FROM t_dish WHERE code = 'D5003'), '冻', 0.00, 1);
+
+-- 生成结果自查：
+--   分类 5 条 / 菜品 20 条 / 标签 24 条 / 食材 79 条 / 规格 40 条 / 餐桌 5 条

@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>推荐实验室 · 食刻</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+  /* 这一页专用：决策矩阵表比较宽，单独给它一套紧凑表格样式 */
+  .mx { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+  .mx th, .mx td { padding: 7px 10px; border-bottom: 1px solid var(--line-2); text-align: right; white-space: nowrap; }
+  .mx th { color: var(--ink-2); font-weight: 600; background: var(--rice); border-bottom: 1px solid var(--line); }
+  .mx td:first-child, .mx th:first-child { text-align: left; }
+  .mx tbody tr:hover { background: var(--rice); }
+  .mx .is-best { color: var(--jade); font-weight: 700; }
+  .mx .is-worst { color: var(--cinnabar); }
+
+  .step-block { border-left: 2px solid var(--line); padding-left: 16px; margin-bottom: 22px; }
+  .step-block h3, .step-block h4 { font-size: var(--fs-base); margin-bottom: 4px; }
+  .step-block h3 .step-no, .step-block h4 .step-no {
+    display: inline-grid; place-items: center;
+    width: 20px; height: 20px; margin-right: 7px;
+    background: var(--pine); color: var(--rice);
+    border-radius: 50%; font-size: 11px; font-family: var(--font-hei);
+  }
+  .step-block p { font-size: var(--fs-sm); color: var(--ink-3); margin: 0 0 10px; }
+
+  .slider-row { display: grid; grid-template-columns: 84px 1fr 60px; gap: 12px; align-items: center; margin-bottom: 13px; }
+  .slider-row input[type=range] { width: 100%; accent-color: var(--cinnabar); }
+  .slider-row .sv { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+</style>
+</head>
+<body class="page">
+
+<header data-topbar></header>
+
+<main id="main">
+  <div class="wrap-wide">
+    <nav class="crumb" aria-label="面包屑">
+      <a href="index.html">首页</a>
+      <iconify-icon icon="mdi:chevron-right" width="14" height="14"></iconify-icon>
+      <span>推荐实验室</span>
+    </nav>
+
+    <div class="page-head">
+      <h1>推荐实验室</h1>
+      <p>AHP 层次分析法定权重，TOPSIS 逼近理想解排序。下面每一步都能看到中间结果。</p>
+    </div>
+
+    <div class="panel" style="border-left:4px solid var(--cinnabar);background:var(--rice)">
+      <h2 style="border:0;padding:0;margin-bottom:10px">这一步在做什么</h2>
+      <p style="margin:0;color:var(--ink-2)">
+        堂食场景里新客占比高，用户—菜品评分矩阵很稀疏，协同过滤冷启动问题重。
+        这里改成<b>只依赖菜品自身属性和用户显式偏好</b>的两段式：<br>
+        先由店铺用 AHP 定出「口味、价格、热度、等待、清淡」五个准则各占多少权重，
+        再用 TOPSIS 把每道菜和「理想菜品」比距离，越近排越前。
+        好处是新客第一次打开就能出结果，而且每一步都能解释给用户听。
+      </p>
+    </div>
+
+    <div class="sec-head">
+      <h2>一、判断矩阵与权重</h2>
+      <span class="sec-note">1–9 标度，由店铺后台维护</span>
+    </div>
+
+    <div class="two-col" style="padding:0">
+      <div class="panel">
+        <h2>判断矩阵 A</h2>
+        <div class="table-wrap">
+          <table class="mx" id="mx-table"></table>
+        </div>
+        <p style="font-size:var(--fs-xs);color:var(--ink-3);margin:12px 0 0">
+          a<sub>ij</sub> 表示准则 i 相对准则 j 的重要程度，a<sub>ji</sub> = 1/a<sub>ij</sub>。
+        </p>
+      </div>
+
+      <div class="panel">
+        <h2>一致性检验</h2>
+        <div id="consistency"></div>
+      </div>
+    </div>
+
+    <div class="sec-head">
+      <h2>二、调整权重看排序怎么变</h2>
+      <span class="sec-note">拖动滑杆，下面的排名实时重算</span>
+    </div>
+
+    <div class="panel">
+      <div id="sliders"></div>
+      <p style="font-size:var(--fs-xs);color:var(--ink-3);margin:14px 0 0">
+        滑杆各自独立拖动，右侧百分比是按五项之和归一化之后的实际权重。
+      </p>
+      <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" type="button" id="reset-w">恢复 AHP 算出的权重</button>
+        <button class="btn btn-ghost btn-sm" type="button" id="uniform-w">五项均分</button>
+        <label class="inline" style="font-size:var(--fs-sm);color:var(--ink-2);margin-left:auto">
+          <input type="checkbox" id="no-spice"> 我不吃辣
+        </label>
+      </div>
+    </div>
+
+    <div class="sec-head">
+      <h2>三、TOPSIS 计算过程</h2>
+      <span class="sec-note">取排名前 8 道展示</span>
+    </div>
+
+    <div class="two-col" style="padding:0">
+      <div>
+        <div class="step-block">
+          <h3><span class="step-no">1</span>原始决策矩阵 X</h3>
+          <p>每行一道菜，每列一个准则。价格和等待是成本型，越低越好。</p>
+          <div class="table-wrap"><table class="mx" id="mx-raw"></table></div>
+        </div>
+      </div>
+      <div>
+        <div class="step-block">
+          <h3><span class="step-no">2</span>正负理想解</h3>
+          <p>在全部在售菜品上按列取极值：效益型取最大、成本型取最小，构成正理想解 V⁺；反之为 V⁻。
+             下表是加权归一后的值，和下面 D⁺、D⁻ 用的是同一组数。</p>
+          <div class="table-wrap"><table class="mx" id="mx-ideal"></table></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2><span class="step-no" style="display:inline-grid;place-items:center;width:20px;height:20px;background:var(--pine);color:var(--rice);border-radius:50%;font-size:11px">3</span>
+        距离与贴近度</h2>
+      <p style="font-size:var(--fs-sm);color:var(--ink-3);margin:0 0 14px">
+        D⁺ 是到正理想解的欧氏距离（越小越好），D⁻ 是到负理想解的距离（越大越好）。
+        贴近度 C = D⁻ / (D⁺ + D⁻)，落在 0–1 之间，按 C 降序排。
+      </p>
+      <div class="table-wrap"><table class="mx" id="mx-result"></table></div>
+    </div>
+
+    <div style="height:60px"></div>
+  </div>
+</main>
+
+<footer data-footer></footer>
+<div class="mobile-bar"></div>
+
+<script src="assets/vendor/iconify-icon.min.js"></script>
+<script src="assets/icons/bundle.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/layout.js"></script>
+<script src="assets/js/recommend.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const keys = CRITERIA.map(c => c.key);
+  const nameOf = k => CRITERIA.find(c => c.key === k).name;
+
+  /* weights 存的是滑杆上的原始刻度（0–50 的整数），不是最终权重。
+     滑杆之间互不牵制，右侧百分比才是归一化之后的实际权重。
+     这样拖动时不需要重建 DOM —— 一旦重建，正在拖的那个 input 会被摘出文档，
+     鼠标拖拽当场断掉，键盘方向键也只能动一格。 */
+  let weights = {};
+  const fromAHP = () => keys.reduce((o, k) => { o[k] = Math.round(SKR.ahpWeights()[k] * 100); return o; }, {});
+  const normalized = () => {
+    const sum = keys.reduce((s, k) => s + weights[k], 0);
+    return keys.reduce((o, k) => { o[k] = sum > 0 ? weights[k] / sum : 0; return o; }, {});
+  };
+
+  let noSpice = false;
+
+  const profile = () => ({ ...USER_PROFILE, avoidSpice: noSpice, maxSpice: noSpice ? 0 : USER_PROFILE.maxSpice });
+
+  /* ---------- 判断矩阵 ---------- */
+  function paintJudgment() {
+    const A = SKR.DEFAULT_JUDGMENT;
+    document.getElementById('mx-table').innerHTML = `
+      <thead><tr><th>准则</th>${keys.map(k => `<th>${nameOf(k)}</th>`).join('')}</tr></thead>
+      <tbody>
+        ${A.map((row, i) => `
+          <tr>
+            <td style="font-weight:600">${nameOf(keys[i])}</td>
+            ${row.map((v, j) => `<td class="${v > 1 ? 'is-best' : v < 1 ? 'is-worst' : ''}">${
+              v >= 1 ? v : '1/' + Math.round(1 / v)
+            }</td>`).join('')}
+          </tr>`).join('')}
+      </tbody>`;
+  }
+
+  /* ---------- 一致性检验 ---------- */
+  function paintConsistency() {
+    const r = SKR.ahp();
+    document.getElementById('consistency').innerHTML = `
+      <div class="summary-row"><span class="k">最大特征根 λ<sub>max</sub></span>
+        <span class="v">${r.lambdaMax.toFixed(4)}</span></div>
+      <div class="summary-row"><span class="k">一致性指标 CI = (λ<sub>max</sub>−n)/(n−1)</span>
+        <span class="v">${r.CI.toFixed(4)}</span></div>
+      <div class="summary-row"><span class="k">随机一致性指标 RI（n=5）</span>
+        <span class="v">${r.RI}</span></div>
+      <div class="summary-row is-total" style="border-top-width:1px;border-top-style:solid">
+        <span class="k" style="font-size:var(--fs-base);letter-spacing:0">CR = CI / RI</span>
+        <span class="v" style="font-size:var(--fs-xl);color:${r.pass ? 'var(--jade)' : 'var(--cinnabar)'}">
+          ${r.CR.toFixed(4)}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:14px;padding:11px 13px;
+                  background:${r.pass ? 'var(--pine-soft)' : 'var(--cinnabar-soft)'};
+                  color:${r.pass ? 'var(--jade)' : 'var(--cinnabar)'};font-size:var(--fs-sm)">
+        <iconify-icon icon="${r.pass ? 'mdi:check-circle' : 'mdi:alert-circle-outline'}" width="17" height="17"></iconify-icon>
+        ${r.pass ? 'CR &lt; 0.1，判断矩阵一致性通过，权重可用。' : 'CR ≥ 0.1，判断矩阵前后矛盾，需要重调。'}
+      </div>`;
+  }
+
+  /* ---------- 权重滑杆 ---------- */
+  /* 只在初始化 / 点「恢复」「均分」时重建一次。拖动过程中只改刻度值和百分比文字，
+     绝不碰 DOM 结构 —— 否则拖拽pointer 会随着节点被移除而中断。 */
+  function paintSliders() {
+    document.getElementById('sliders').innerHTML = keys.map(k => `
+      <div class="slider-row">
+        <span style="font-size:var(--fs-sm);color:var(--ink-2)">${nameOf(k)}</span>
+        <input type="range" min="0" max="50" step="1" data-w="${k}"
+               value="${weights[k]}" aria-label="${nameOf(k)}权重">
+        <span class="sv" data-sv="${k}"></span>
+      </div>`).join('');
+
+    document.querySelectorAll('[data-w]').forEach(r =>
+      r.addEventListener('input', () => {
+        weights[r.dataset.w] = Number(r.value);
+        paintPercents();
+        paint();
+      }));
+
+    paintPercents();
+  }
+
+  /* 百分比单独刷新，不重建滑杆本身 */
+  function paintPercents() {
+    const n = normalized();
+    keys.forEach(k => {
+      const el = document.querySelector(`[data-sv="${k}"]`);
+      if (el) el.textContent = `${(n[k] * 100).toFixed(0)}%`;
+    });
+  }
+
+  /* ---------- 结果表 ---------- */
+  function paint() {
+    const ranked = SKR.recommend(DISHES, profile(), normalized());
+    const top = ranked.slice(0, 8);
+
+    // 原始决策矩阵
+    document.getElementById('mx-raw').innerHTML = `
+      <thead><tr><th>菜品</th>${keys.map(k => {
+        const c = CRITERIA.find(x => x.key === k);
+        return `<th>${c.name}${c.unit ? `(${c.unit})` : ''}${c.benefit ? '' : ' ↓'}</th>`;
+      }).join('')}</tr></thead>
+      <tbody>${top.map(s => `
+        <tr>
+          <td>${SK.esc(s.dish.name)}</td>
+          ${keys.map(k => `<td>${k === 'price' ? s.raw[k] : k === 'wait' ? s.raw[k] : s.raw[k].toFixed(1)}</td>`).join('')}
+        </tr>`).join('')}</tbody>`;
+
+    /* 正负理想解直接取 topsis 内部算出来的那一组（向量归一化 + 加权之后的值）。
+       这里以前是拿展示用的 top8 原始值重新求列极值 —— 一是跟下面 D⁺/D⁻ 用的
+       不是同一组数，手算对不上；二是 V⁺/V⁻ 本来就必须在全部备选上取，
+       只在前 8 名里取，第 9 名的极端值会被忽略。 */
+    const w = normalized();
+    document.getElementById('mx-ideal').innerHTML = `
+      <thead><tr><th>准则</th><th>权重 w</th><th>V⁺ 正理想</th><th>V⁻ 负理想</th></tr></thead>
+      <tbody>${keys.map((k, j) => `
+        <tr>
+          <td>${nameOf(k)}
+            <span style="color:var(--ink-3);font-weight:400">
+              ${CRITERIA[j].benefit ? '效益型' : '成本型↓'}
+            </span>
+          </td>
+          <td>${w[k].toFixed(3)}</td>
+          <td class="is-best">${ranked.ideal[j].toFixed(4)}</td>
+          <td class="is-worst">${ranked.anti[j].toFixed(4)}</td>
+        </tr>`).join('')}</tbody>`;
+
+    // 距离与贴近度
+    document.getElementById('mx-result').innerHTML = `
+      <thead><tr>
+        <th>#</th><th>菜品</th><th>D⁺</th><th>D⁻</th><th>贴近度 C</th>
+        <th>出餐</th><th>单价</th><th></th>
+      </tr></thead>
+      <tbody>${top.map(s => `
+        <tr>
+          <td style="font-weight:700;color:var(--ink-3)">${s.rank}</td>
+          <td>${SK.esc(s.dish.name)}</td>
+          <td>${s.dPlus.toFixed(4)}</td>
+          <td>${s.dMinus.toFixed(4)}</td>
+          <td><strong style="color:var(--cinnabar)">${s.closeness.toFixed(4)}</strong></td>
+          <td>${s.dish.prepMin} 分</td>
+          <td>¥${SK.money(s.dish.price)}</td>
+          <td><a href="dish.html?id=${s.dish.id}" style="color:var(--cinnabar)">详情 →</a></td>
+        </tr>`).join('')}</tbody>`;
+  }
+
+  /* ---------- 交互 ---------- */
+  document.getElementById('reset-w').addEventListener('click', () => {
+    weights = fromAHP();
+    paintSliders(); paint();
+    SK.toast('已恢复 AHP 算出的权重', 'mdi:check-circle');
+  });
+  document.getElementById('uniform-w').addEventListener('click', () => {
+    keys.forEach(k => { weights[k] = 20; });
+    paintSliders(); paint();
+    SK.toast('五个准则各占 20%', 'mdi:check-circle');
+  });
+  document.getElementById('no-spice').addEventListener('change', (e) => {
+    noSpice = e.target.checked;
+    paint();
+  });
+
+  weights = fromAHP();
+  paintJudgment();
+  paintConsistency();
+  paintSliders();
+  paint();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+# 一键演示模式：内嵌 H2 文件数据库，不需要 MySQL。
+#
+# 用途只有一个 —— 打发布包。解压双击 run.bat 就能跑，
+# 答辩现场换一台没装 MySQL 的电脑也不掉链子。
+#
+# 开发时不要用这个 profile：开发库是 MySQL，和 H2 的数据不互通。
+# 启动：java -jar shike-ordering.jar --spring.profiles.active=demo
+#
+# H2 跑的是 MODE=MySQL，所以 db/schema.sql 和 db/data.sql 原样沿用，
+# 不需要维护第二套建表脚本。实测这两份脚本在 H2 2.3 上直接通过
+# （ENGINE / CHARSET / COMMENT / INSERT IGNORE 在 MySQL 模式下都被接受）。
+server:
+  port: 8080
+
+spring:
+  datasource:
+    driver-class-name: org.h2.Driver
+    # 文件库放在启动目录下的 data/，删掉 data/ 再启动就是全新演示数据
+    url: jdbc:h2:file:./data/shike;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password:
+
+mybatis-plus:
+  configuration:
+    # 演示包不需要把每条 SQL 都打出来，控制台干净一点
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
+
+logging:
+  level:
+    com.shike.ordering: info

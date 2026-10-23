@@ -1,0 +1,92 @@
+server:
+  port: 8080
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
+
+spring:
+  application:
+    name: shike-ordering
+
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # createDatabaseIfNotExist 让首次启动能自己把库建出来，
+    # 换台机器只要 MySQL 在跑、账号密码对，不用手动建库。
+    url: jdbc:mysql://localhost:3306/shike_ordering?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:123456}
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 5000
+
+  # 建表 + 灌演示数据。schema.sql 全是 IF NOT EXISTS，
+  # data.sql 全是 INSERT IGNORE，所以每次启动重跑都是安全的：
+  # 表不会被重建，管理员改过的库存和价格也不会被覆盖回去。
+  sql:
+    init:
+      mode: always
+      encoding: UTF-8
+      schema-locations: classpath:db/schema.sql
+      data-locations: classpath:db/data.sql
+
+  # 缓存默认走 JVM 内存。本机和答辩机器都没装 Redis，
+  # 把这里改成 redis 由 CacheConfig 切换实现。
+  cache:
+    type: simple
+
+  # Redis 配置放着备用。没有 --spring.profiles.active=redis 时
+  # 不会有人去连它，所以没装 Redis 也能正常启动。
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 2000ms
+
+mybatis-plus:
+  configuration:
+    # 数据库里是 snake_case，实体里是 camelCase，交给它自动转
+    map-underscore-to-camel-case: true
+    # 开发期把 SQL 打出来，方便对着论文里的截图讲「这条查询是怎么走的」
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# ---- 本项目自定义配置 ----
+shike:
+  jwt:
+    # HS256 要求密钥至少 256 位（32 字节），短了 jjwt 会直接抛异常。
+    # 正式部署要改成环境变量注入，别把生产密钥提交进仓库。
+    secret: ${JWT_SECRET:shike-ordering-graduation-project-dev-secret-key-do-not-use-in-production}
+    # 令牌有效期（小时）。堂食一顿饭的时长量级，够用又不会长期留着一把可用的钥匙
+    expire-hours: 12
+  cors:
+    # 前端 Vue 开发服务器。Vite 默认 5173，端口被占时会顺延
+    allowed-origins: http://localhost:5173,http://127.0.0.1:5173
+  order:
+    # 2026-10-17 用户拍板：餐不收服务费。比例配成 0 而不是删掉机制，
+    # 哪天真要收改这一行即可。详见 设计确认清单.md 第 2 条
+    service-fee-rate: 0.00
+    # 自提立减：自取的订单减掉小计的 2%，最多减 4 元。
+    # 顾客自己来拿省了服务成本，让点利比"收打包费"更好接受
+    takeout-discount-rate: 0.02
+    takeout-discount-cap: 4.00
+
+  # 门店信息。页头页脚、小票抬头都要用，放在这里保证只有一份。
+  # 真要改门店信息，改这一处，不用去翻 data.js 和前端常量
+  shop:
+    name: 食刻
+    sub: SHI KE KITCHEN
+    slogan: 现做现出，等你开饭
+    phone: 0592-8888 6666
+    address: 厦门市集美区理工路 600 号 一层 08 铺
+    hours: 每日 10:30 — 22:00（21:30 停止点单）
+
+logging:
+  level:
+    com.shike.ordering: debug

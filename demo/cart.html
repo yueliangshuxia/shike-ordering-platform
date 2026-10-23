@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>我的点单 · 食刻</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="page">
+
+<header data-topbar></header>
+
+<main id="main">
+  <div class="wrap-wide">
+    <nav class="crumb" aria-label="面包屑">
+      <a href="index.html">首页</a>
+      <iconify-icon icon="mdi:chevron-right" width="14" height="14"></iconify-icon>
+      <span>我的点单</span>
+    </nav>
+
+    <div class="page-head">
+      <h1>我的点单</h1>
+      <p id="cart-sub">确认一下再下单</p>
+    </div>
+
+    <div id="cart-root"></div>
+  </div>
+</main>
+
+<footer data-footer></footer>
+<div class="mobile-bar"></div>
+
+<script src="assets/vendor/iconify-icon.min.js"></script>
+<script src="assets/icons/bundle.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/layout.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const root = document.getElementById('cart-root');
+
+  function render() {
+    const lines = SK.cart.lines;
+
+    if (!lines.length) {
+      document.getElementById('cart-sub').textContent = '还空着';
+      root.innerHTML = `
+        <div class="empty-state" style="padding-bottom:100px">
+          <img src="assets/illustrations/add_to_cart_vkjp.svg" alt="">
+          <h2>点单还是空的</h2>
+          <p>去菜单里挑几道，或者让系统按你的口味推荐几道。</p>
+          <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+            <a class="btn btn-primary" href="menu.html">去点菜</a>
+            <a class="btn btn-ghost" href="recommend.html">按我的口味推荐</a>
+          </div>
+        </div>`;
+      return;
+    }
+
+    document.getElementById('cart-sub').textContent = `共 ${SK.count()} 件`;
+    const subtotal = SK.subtotal();
+    /* 不收服务费（2026-10-17 定）。购物车这一步还没选堂食/自取，
+       所以自提立减也算不了 —— 那一项到结算页才出现。 */
+    const total = subtotal;
+
+    root.innerHTML = `
+      <div class="two-col">
+        <div>
+          <div class="table-wrap">
+            <table class="data">
+              <thead>
+                <tr>
+                  <th style="width:44%">菜品</th>
+                  <th>规格</th>
+                  <th style="text-align:right">单价</th>
+                  <th style="text-align:center">数量</th>
+                  <th style="text-align:right">小计</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                ${lines.map((l) => {
+                  const d = SK.dishById(l.dishId);
+                  if (!d) return '';
+                  const spec = d.specs[l.specIndex] || d.specs[0];
+                  const unit = SK.unitPrice(l);
+                  return `
+                  <tr>
+                    <td>
+                      <div class="cell-dish">
+                        <img src="${SK.img(d)}" alt="">
+                        <div>
+                          <a href="dish.html?id=${d.id}" style="font-weight:600">${SK.esc(d.name)}</a>
+                          <div style="font-size:var(--fs-xs);color:var(--ink-3)">约 ${d.prepMin} 分钟出餐</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td style="color:var(--ink-2);font-size:var(--fs-sm)">${SK.esc(spec?.name || '标准')}</td>
+                    <td style="text-align:right" class="num">¥${SK.money(unit)}</td>
+                    <td>
+                      <div class="qty-box" style="margin-inline:auto;width:max-content">
+                        <button type="button" data-dec="${d.id}" data-spec="${l.specIndex}" aria-label="减少">${SK.ic('mdi:minus', 14)}</button>
+                        <span class="qty">${l.qty}</span>
+                        <button type="button" data-inc="${d.id}" data-spec="${l.specIndex}" aria-label="增加">${SK.ic('mdi:plus', 14)}</button>
+                      </div>
+                    </td>
+                    <td style="text-align:right;font-weight:700" class="num">¥${SK.money(unit * l.qty)}</td>
+                    <td>
+                      <button class="icon-btn" style="color:var(--ink-3)" type="button"
+                              data-del="${d.id}" data-spec="${l.specIndex}" aria-label="删除 ${SK.esc(d.name)}">
+                        ${SK.ic('mdi:delete-outline', 17)}
+                      </button>
+                    </td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+
+          <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+            <a class="btn btn-ghost" href="menu.html">${SK.ic('mdi:plus', 17)}继续点菜</a>
+            <button class="btn btn-ghost" type="button" id="clear-cart" style="color:var(--ink-3)">
+              ${SK.ic('mdi:delete-outline', 17)}清空点单
+            </button>
+          </div>
+
+          <div class="panel" style="margin-top:22px">
+            <h2>${SK.ic('mdi:timer-sand', 18)}预计等餐时间</h2>
+            <p style="color:var(--ink-2);margin:0">
+              ${(() => {
+                // 后厨同时开工，等餐时间按最长的那道算，而不是加起来
+                const waits = lines.map((l) => SK.dishById(l.dishId)?.prepMin || 0);
+                const max = Math.max(...waits);
+                const busy = 4;  // 演示：前面的排队单数
+                return `当前后厨有 ${busy} 单在排。你这单最长的一道要
+                  <strong style="color:var(--cinnabar)">${max} 分钟</strong>，
+                  预计 <strong>${max + busy * 2} 分钟</strong>后开始上菜。`;
+              })()}
+            </p>
+          </div>
+        </div>
+
+        <aside class="summary-card">
+          <h2>小 计</h2>
+          <div class="summary-body">
+            <div class="summary-row"><span class="k">菜品</span><span class="v">¥${SK.money(subtotal)}</span></div>
+            <div class="summary-row"><span class="k">服务费</span><span class="v">不收</span></div>
+            <div class="summary-row"><span class="k">自提立减</span><span class="v">结算时算</span></div>
+            <div class="summary-row is-total">
+              <span class="k">合 计</span><span class="v">¥${SK.money(total)}</span>
+            </div>
+            <a class="btn btn-primary btn-block btn-lg" href="checkout.html" style="margin-top:16px">
+              ${SK.ic('mdi:arrow-right', 19)}去结算
+            </a>
+            <p style="font-size:var(--fs-xs);color:var(--ink-3);margin:12px 0 0;text-align:center">
+              下单后后厨立即出单，30 分钟内可取消
+            </p>
+          </div>
+        </aside>
+      </div>`;
+  }
+
+  // 加减不在这里处理 —— app.js 已经把 [data-inc] / [data-dec] 全局代理掉了。
+  // 这里再绑一次的话，同一次点击会被两边各执行一遍，数量跳 2。
+  // 本页只负责「删除」，以及订阅 sk:cart-change 重画。
+  root.addEventListener('click', (e) => {
+    const del = e.target.closest('[data-del]');
+    if (!del) return;
+    SK.removeLine(del.dataset.del, Number(del.dataset.spec));
+    SK.toast('已从点单里去掉', 'mdi:delete-outline');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('#clear-cart')) {
+      SK.clear();
+      SK.toast('点单已清空', 'mdi:delete-outline');
+    }
+  });
+
+  document.addEventListener('sk:cart-change', render);
+  render();
+});
+</script>
+</body>
+</html>

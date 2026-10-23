@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>菜品详情 · 食刻</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="page">
+
+<header data-topbar></header>
+
+<main id="main">
+  <div class="wrap-wide">
+    <div id="detail-root"></div>
+  </div>
+</main>
+
+<footer data-footer></footer>
+<div class="mobile-bar"></div>
+
+<script src="assets/vendor/iconify-icon.min.js"></script>
+<script src="assets/icons/bundle.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/layout.js"></script>
+<script src="assets/js/recommend.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const id = new URLSearchParams(location.search).get('id');
+  const d = SK.dishById(id);
+  const root = document.getElementById('detail-root');
+
+  if (!d) {
+    root.innerHTML = `
+      <div class="empty-state">
+        <img src="assets/illustrations/questions_75e0.svg" alt="">
+        <h2>没找到这道菜</h2>
+        <p>可能是链接过期了，或者菜品已经下架。</p>
+        <a class="btn btn-primary" href="menu.html">回菜单看看</a>
+      </div>`;
+    return;
+  }
+
+  document.title = `${d.name} · 食刻`;
+
+  const cat = SK.catById(d.cat);
+  const sold = d.stock === 0;
+  // 同一分类下的其他菜，做「同类推荐」
+  const siblings = DISHES.filter((x) => x.cat === d.cat && x.id !== d.id && x.stock > 0).slice(0, 4);
+
+  // 这道菜在 TOPSIS 里的名次和分项表现，是详情页最值得给的信息之一
+  const ranked = SKR.recommend(DISHES, USER_PROFILE);
+  const self = ranked.find((r) => r.dish.id === d.id);
+  const criteriaName = { taste: '口味匹配', price: '价格实惠', hot: '热度口碑', wait: '出餐速度', healthy: '清淡健康' };
+
+  root.innerHTML = `
+    <nav class="crumb" aria-label="面包屑">
+      <a href="index.html">首页</a>
+      <iconify-icon icon="mdi:chevron-right" width="14" height="14"></iconify-icon>
+      <a href="menu.html">点餐</a>
+      <iconify-icon icon="mdi:chevron-right" width="14" height="14"></iconify-icon>
+      <a href="menu.html#${d.cat}">${cat?.name || ''}</a>
+      <iconify-icon icon="mdi:chevron-right" width="14" height="14"></iconify-icon>
+      <span>${SK.esc(d.name)}</span>
+    </nav>
+
+    <div class="detail-grid" style="padding-top:22px">
+
+      <!-- 左：图 -->
+      <div>
+        <div class="detail-photo">
+          <img src="${SK.img(d)}" alt="${SK.esc(d.name)}">
+        </div>
+        ${siblings.length ? `
+        <div class="detail-thumbs" role="group" aria-label="同类菜品">
+          ${siblings.map((s) => `
+            <a href="dish.html?id=${s.id}" title="${SK.esc(s.name)}">
+              <img src="${SK.img(s)}" alt="${SK.esc(s.name)}">
+            </a>`).join('')}
+        </div>
+        <p style="font-size:var(--fs-xs);color:var(--ink-3);margin-top:8px">
+          ${cat?.name || ''}里还有这些
+        </p>` : ''}
+      </div>
+
+      <!-- 右：信息 -->
+      <div>
+        <h1 class="detail-title">${SK.esc(d.name)}</h1>
+
+        <div class="detail-meta">
+          <span class="rating">
+            ${SK.ic('mdi:star', 16)}<span class="num">${d.rating}</span>
+          </span>
+          <span style="color:var(--ink-3);font-size:var(--fs-sm)">月售 ${d.sold}</span>
+          <span style="color:var(--ink-3);font-size:var(--fs-sm);display:inline-flex;align-items:center;gap:4px">
+            ${SK.ic('mdi:clock-outline', 14)}约 ${d.prepMin} 分钟出餐
+          </span>
+          ${d.stock > 0 && d.stock <= 20
+            ? `<span class="tag tag-hot">仅剩 ${d.stock} ${d.unit}</span>` : ''}
+        </div>
+
+        <div class="dish-tags" style="margin-bottom:16px">
+          ${SK.spiceTag(d.spice)}
+          ${d.tags.filter((t) => t !== '招牌').map(SK.tagOf).join('')}
+          ${d.tags.includes('招牌') ? SK.tagOf('招牌') : ''}
+        </div>
+
+        <div class="detail-price" id="d-price"></div>
+        <p class="detail-desc">${SK.esc(d.detail)}</p>
+
+        <div id="spec-area"></div>
+
+        <div class="spec-group">
+          <div class="spec-label">${SK.ic('mdi:seed-outline', 15)}主要食材</div>
+          <div class="ingredient-list">
+            ${d.ingredients.map((i) => `<span class="ingredient">${SK.ic('mdi:sprout', 13)}${SK.esc(i)}</span>`).join('')}
+          </div>
+        </div>
+
+        <!-- 推荐理由：把这道菜在 TOPSIS 里的分项摊开 -->
+        ${self ? `
+        <div style="background:var(--rice);border-left:2px solid var(--cinnabar);padding:13px 16px;margin-bottom:20px">
+          <div style="font-family:var(--font-song);font-weight:700;margin-bottom:9px">
+            按你的口味排第 ${self.rank} 名（共 ${ranked.length} 道在售）
+          </div>
+          <div class="weight-list">
+            ${CRITERIA.map((c) => {
+              const v = self.raw[c.key];
+              const pct = c.key === 'price' ? Math.max(0, 100 - v * 1.6)
+                        : c.key === 'wait'  ? Math.max(0, 100 - v * 6)
+                        : v;
+              return `
+              <div class="weight-row">
+                <span class="w-name">${criteriaName[c.key]}</span>
+                <span class="w-track"><span class="w-fill" style="width:${pct.toFixed(1)}%"></span></span>
+                <span class="w-val">${c.key === 'price' ? '¥' + v : c.key === 'wait' ? v + '分' : v.toFixed(0)}</span>
+              </div>`;
+            }).join('')}
+          </div>
+          <div class="weight-foot">
+            综合贴近度 <strong style="color:var(--cinnabar)">${self.closeness.toFixed(4)}</strong>
+            <span style="margin-left:auto">
+              <a href="recommend.html" style="color:var(--cinnabar)">看完整算法 →</a>
+            </span>
+          </div>
+        </div>` : ''}
+
+        <div class="detail-buy">
+          <div class="buy-total">
+            <div class="bt-label">合计</div>
+            <div class="bt-value" id="buy-total"></div>
+          </div>
+          <div class="qty-box" style="height:40px">
+            <button type="button" id="q-dec" aria-label="减少数量">${SK.ic('mdi:minus', 16)}</button>
+            <span class="qty" id="q-val" style="min-width:38px;font-size:var(--fs-md)">1</span>
+            <button type="button" id="q-inc" aria-label="增加数量">${SK.ic('mdi:plus', 16)}</button>
+          </div>
+          <button class="btn btn-primary btn-lg" id="add" ${sold ? 'disabled' : ''}>
+            ${SK.ic(sold ? 'mdi:close' : 'mdi:cart-outline', 19)}
+            ${sold ? '今日已售罄' : '加入点单'}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 同类菜 -->
+    ${siblings.length ? `
+    <div class="sec-head">
+      <h2>${cat?.name || ''}里还有</h2>
+      <a class="sec-note" href="menu.html#${d.cat}" style="color:var(--cinnabar)">看全部 →</a>
+    </div>
+    <div class="dish-grid" style="padding-bottom:60px">
+      ${DISHES.filter((x) => x.cat === d.cat && x.id !== d.id).map(SK.dishCard).join('')}
+    </div>` : ''}
+  `;
+
+  /* ---- 规格与数量 ---- */
+  let specIndex = 0;
+  let qty = 1;
+
+  function unitPrice() {
+    const s = d.specs[specIndex] || d.specs[0];
+    return d.price + (s?.delta || 0);
+  }
+
+  function paint() {
+    document.getElementById('d-price').innerHTML =
+      `<span class="cur">¥</span>${SK.money(unitPrice())}`;
+    document.getElementById('buy-total').textContent = '¥' + SK.money(unitPrice() * qty);
+    document.getElementById('q-val').textContent = qty;
+  }
+
+  document.getElementById('spec-area').innerHTML = `
+    <div class="spec-group">
+      <div class="spec-label">${SK.ic('mdi:tune-variant', 15)}${d.specLabel || '规格'}</div>
+      <div class="spec-opts" id="spec-opts">
+        ${d.specs.map((s, i) => `
+          <button class="spec-opt${i === 0 ? ' is-on' : ''}" type="button" data-i="${i}">
+            ${SK.esc(s.name)}${s.delta ? `<span class="opt-delta">+¥${SK.money(s.delta)}</span>` : ''}
+          </button>`).join('')}
+      </div>
+    </div>`;
+
+  document.getElementById('spec-opts').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-i]');
+    if (!btn) return;
+    specIndex = Number(btn.dataset.i);
+    document.querySelectorAll('#spec-opts .spec-opt')
+      .forEach((b) => b.classList.toggle('is-on', b === btn));
+    paint();
+  });
+
+  document.getElementById('q-inc').addEventListener('click', () => { qty = Math.min(qty + 1, 99); paint(); });
+  document.getElementById('q-dec').addEventListener('click', () => { qty = Math.max(qty - 1, 1); paint(); });
+
+  document.getElementById('add').addEventListener('click', () => {
+    if (SK.add(d.id, specIndex, qty)) {
+      SK.pressStamp();
+      SK.toast(`已加入点单：${d.name} ×${qty}`, 'mdi:cart-outline');
+    }
+  });
+
+  paint();
+});
+</script>
+</body>
+</html>

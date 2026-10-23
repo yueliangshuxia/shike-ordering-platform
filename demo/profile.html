@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>个人中心 · 食刻</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="page">
+
+<header data-topbar></header>
+
+<main id="main">
+  <div class="wrap-wide">
+    <nav class="crumb" aria-label="面包屑">
+      <a href="index.html">首页</a>
+      <iconify-icon icon="mdi:chevron-right" width="14" height="14"></iconify-icon>
+      <span>个人中心</span>
+    </nav>
+
+    <div class="page-head">
+      <h1>个人中心</h1>
+      <p>口味偏好会直接喂给推荐算法，改了排名就会变</p>
+    </div>
+
+    <div class="two-col">
+
+      <div>
+        <!-- 口味偏好 -->
+        <div class="panel">
+          <h2><iconify-icon icon="mdi:tune-variant" width="18" height="18"></iconify-icon>口味偏好</h2>
+          <p style="font-size:var(--fs-sm);color:var(--ink-2);margin:0 0 16px">
+            这些选项会影响推荐结果里的「口味匹配」和「清淡健康」两项得分。
+          </p>
+
+          <div class="spec-group">
+            <div class="spec-label">我常点的分类（可多选）</div>
+            <div class="spec-opts" id="pref-cats"></div>
+          </div>
+
+          <div class="spec-group">
+            <div class="spec-label">我能接受的辣度上限</div>
+            <div class="spec-opts" id="pref-spice"></div>
+          </div>
+
+          <div class="spec-group" style="margin-bottom:0">
+            <div class="spec-label">忌口</div>
+            <div class="spec-opts" id="pref-avoid"></div>
+          </div>
+
+          <div style="display:flex;gap:10px;margin-top:22px;align-items:center">
+            <button class="btn btn-primary" type="button" id="save-pref">
+              <iconify-icon icon="mdi:content-save-outline" width="17" height="17"></iconify-icon>保存偏好
+            </button>
+            <a class="btn btn-ghost" href="recommend.html">去推荐实验室看效果</a>
+          </div>
+        </div>
+
+        <!-- 我的订单 -->
+        <div class="panel">
+          <h2><iconify-icon icon="mdi:clipboard-list-outline" width="18" height="18"></iconify-icon>最近订单</h2>
+          <div id="my-orders"></div>
+          <a class="btn btn-ghost btn-block" href="order.html" style="margin-top:14px">查看全部订单</a>
+        </div>
+      </div>
+
+      <aside>
+        <!-- 用户卡 -->
+        <div class="summary-card" style="margin-bottom:18px">
+          <h2>我 的 账 号</h2>
+          <div class="summary-body" style="text-align:center">
+            <div style="width:76px;height:76px;margin:0 auto 12px;border-radius:50%;
+                        background:var(--pine-soft);color:var(--pine);display:grid;place-items:center;
+                        font-family:var(--font-song);font-size:30px;font-weight:700"
+                 id="u-avatar">陈</div>
+            <div style="font-family:var(--font-song);font-size:var(--fs-lg);font-weight:700"
+                 id="u-name">陈同学</div>
+            <div style="color:var(--ink-3);font-size:var(--fs-sm);margin-bottom:14px" id="u-meta">
+              138****6621 · 常客
+            </div>
+            <!-- 三个数都由 ORDERS 现算（见页面底部脚本）。原来这里是写死的
+                 「12 到店 / 3 张券 / 286 积分」，券和积分在系统里根本没有对应的
+                 功能，评委一问"这券怎么用"就答不上来。换成三个真算得出来的数。 -->
+            <div style="display:flex;gap:1px;background:var(--line);border:1px solid var(--line)">
+              <div style="flex:1;background:var(--card);padding:11px 6px">
+                <div style="font-family:var(--font-song);font-size:var(--fs-lg);font-weight:700" id="stat-visits">—</div>
+                <div style="font-size:var(--fs-xs);color:var(--ink-3)">到店次数</div>
+              </div>
+              <div style="flex:1;background:var(--card);padding:11px 6px">
+                <div style="font-family:var(--font-song);font-size:var(--fs-lg);font-weight:700" id="stat-spent">—</div>
+                <div style="font-size:var(--fs-xs);color:var(--ink-3)">累计消费</div>
+              </div>
+              <div style="flex:1;background:var(--card);padding:11px 6px">
+                <div style="font-family:var(--font-song);font-size:var(--fs-lg);font-weight:700" id="stat-cat">—</div>
+                <div style="font-size:var(--fs-xs);color:var(--ink-3)">常点分类</div>
+              </div>
+            </div>
+            <a class="btn btn-ghost btn-block" href="login.html" style="margin-top:14px">切换账号</a>
+          </div>
+        </div>
+
+      </aside>
+    </div>
+  </div>
+</main>
+
+<footer data-footer></footer>
+<div class="mobile-bar"></div>
+
+<script src="assets/vendor/iconify-icon.min.js"></script>
+<script src="assets/icons/bundle.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/layout.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const P = USER_PROFILE;
+
+  // 账号卡跟着登录态走：登录页写过 sk_user_v1，app.js 已把它并进 USER_PROFILE
+  document.getElementById('u-name').textContent = P.user.name;
+  document.getElementById('u-avatar').textContent = (P.user.name || '食').slice(0, 1);
+  document.getElementById('u-meta').textContent = `${P.user.phone} · ${P.user.level}`;
+
+  // 三个统计数都由订单数据现算，不是写死的装饰数字。
+  // 已取消的单不计入 —— 那笔没吃成，不构成"到店"或"消费"。
+  (function paintStats() {
+    const done = ORDERS.filter(o => o.status !== '已取消');
+
+    const byId = Object.fromEntries(DISHES.map(d => [d.id, d]));
+    let total = 0;
+    const catTally = {};
+    for (const o of done) {
+      for (const it of o.items) {
+        const d = byId[it.id];
+        if (!d) continue;
+        total += d.price * it.qty;
+        catTally[d.cat] = (catTally[d.cat] || 0) + it.qty;
+      }
+    }
+    // 累计消费按菜品小计算。不收服务费，自提立减只影响自取单，
+    // 而这里的演示订单都是堂食 —— 口径一致，不需要再补加成
+    const topCat = Object.entries(catTally).sort((a, b) => b[1] - a[1])[0];
+    const catName = topCat ? (CATEGORIES.find(c => c.id === topCat[0]) || {}).name : '—';
+
+    document.getElementById('stat-visits').textContent = done.length;
+    document.getElementById('stat-spent').textContent = '¥' + SK.money(total);
+    document.getElementById('stat-cat').textContent = catName || '—';
+  })();
+
+  // app.js 的 loadProfile() 已经把「本地存的偏好」和「data.js 的初始画像」
+  // 合并进 USER_PROFILE 了，这里只需要拷一份可以随手改的副本。
+  let preferCats = [...P.preferCats];
+  let maxSpice = P.maxSpice;
+  let avoid = [...(P.avoid || [])];
+
+  const chip = (on, label, attrs) =>
+    `<button class="spec-opt${on ? ' is-on' : ''}" type="button" ${attrs}>${label}</button>`;
+
+  function paint() {
+    document.getElementById('pref-cats').innerHTML = CATEGORIES.map(c =>
+      chip(preferCats.includes(c.id), c.name, `data-cat="${c.id}"`)).join('');
+
+    document.getElementById('pref-spice').innerHTML =
+      [0, 1, 2, 3].map(l =>
+        chip(maxSpice === l, ['不吃辣', '微辣', '中辣', '特辣'][l], `data-spice="${l}"`)).join('');
+
+    const AVOID = ['香菜', '葱', '蒜', '内脏', '牛羊肉'];
+    document.getElementById('pref-avoid').innerHTML = AVOID.map(a =>
+      chip(avoid.includes(a), a, `data-avoid="${a}"`)).join('');
+  }
+
+  document.addEventListener('click', (e) => {
+    const cat = e.target.closest('[data-cat]');
+    const sp = e.target.closest('[data-spice]');
+    const av = e.target.closest('[data-avoid]');
+
+    if (cat) {
+      const id = cat.dataset.cat;
+      preferCats = preferCats.includes(id) ? preferCats.filter(x => x !== id) : [...preferCats, id];
+      paint();
+    } else if (sp) {
+      maxSpice = Number(sp.dataset.spice);
+      paint();
+    } else if (av) {
+      const a = av.dataset.avoid;
+      avoid = avoid.includes(a) ? avoid.filter(x => x !== a) : [...avoid, a];
+      paint();
+    }
+  });
+
+  document.getElementById('save-pref').addEventListener('click', () => {
+    localStorage.setItem('sk_pref_v1', JSON.stringify({ preferCats, maxSpice, avoid }));
+    // 同步到全局画像，本页和跳过去的页面都读 USER_PROFILE。
+    // avoid 以前漏了同步，导致「忌口」存了却从来没人用。
+    USER_PROFILE.preferCats = preferCats;
+    USER_PROFILE.maxSpice = maxSpice;
+    USER_PROFILE.avoid = avoid;
+    USER_PROFILE.avoidSpice = maxSpice === 0;
+    SK.toast('偏好已保存，推荐结果会按新的来', 'mdi:check-circle');
+  });
+
+  // 最近订单
+  const mine = JSON.parse(localStorage.getItem('sk_orders_v1') || '[]');
+  const recent = [...mine, ...ORDERS].slice(0, 3);
+  document.getElementById('my-orders').innerHTML = recent.map(o => {
+    /* 这里要的是"实付"，两个分支都必须给最终金额：
+       本地下的单存了实际应付（含自取优惠），直接用；
+       data.js 的演示订单没这些字段，才按菜品现算再加 5% 服务费。 */
+    const total = typeof o.total === 'number' ? o.total : (() => {
+      const sub = o.items.reduce((s, it) => {
+        const d = SK.dishById(it.id);
+        if (!d) return s;
+        const spec = d.specs[it.specIndex || 0] || d.specs[0];
+        return s + (d.price + (spec?.delta || 0)) * it.qty;
+      }, 0);
+      return sub;   // 不收服务费，订单金额就是菜品小计
+    })();
+    const cls = { 已下单: 'pill-hot', 制作中: 'pill-warn', 已完成: 'pill-ok' }[o.status] || '';
+    return `
+      <div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line-2)">
+        <span style="flex:1;min-width:0">
+          <span style="display:block;font-size:var(--fs-sm);font-variant-numeric:tabular-nums">${o.no}</span>
+          <span style="display:block;font-size:var(--fs-xs);color:var(--ink-3)">${o.time} · ${o.table} 桌</span>
+        </span>
+        <span class="pill ${cls}">${o.status}</span>
+        <strong style="color:var(--cinnabar)">¥${SK.money(total)}</strong>
+      </div>`;
+  }).join('');
+
+  paint();
+});
+</script>
+</body>
+</html>

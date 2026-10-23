@@ -1,0 +1,35 @@
+# Java / Maven
+server/target/
+*.class
+
+# 本机使用的 Maven（11MB，换台机器自己解压到 .tooling/）
+.tooling/
+
+# 日志
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Vue 依赖与构建产物
+node_modules/
+dist/
+
+# 打包产物 / 演示数据
+release/
+data/
+server/src/main/resources/static/
+
+# 脚本的过程产物（截图、无头浏览器 profile、校对图）
+tools/_shots/
+tools/_chrome_profile/
+tools/_verify_profile/
+tools/_contact_sheet.jpg
+tools/_probe_tmp*
+web/_shots*
+
+# 临时文件
+.tmp/
+__pycache__/

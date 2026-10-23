@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>结算 · 食刻</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="page">
+
+<header data-topbar></header>
+
+<main id="main">
+  <div class="wrap-wide">
+    <nav class="crumb" aria-label="面包屑">
+      <a href="index.html">首页</a>
+      <iconify-icon icon="mdi:chevron-right" width="14" height="14"></iconify-icon>
+      <a href="cart.html">我的点单</a>
+      <iconify-icon icon="mdi:chevron-right" width="14" height="14"></iconify-icon>
+      <span>结算</span>
+    </nav>
+
+    <div class="page-head">
+      <h1>结算</h1>
+      <p>确认桌号和就餐方式，下单后后厨立刻出单</p>
+    </div>
+
+    <div id="checkout-root"></div>
+  </div>
+</main>
+
+<footer data-footer></footer>
+<div class="mobile-bar"></div>
+
+<script src="assets/vendor/iconify-icon.min.js"></script>
+<script src="assets/icons/bundle.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/layout.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const root = document.getElementById('checkout-root');
+
+  if (!SK.cart.lines.length) {
+    root.innerHTML = `
+      <div class="empty-state" style="padding-bottom:100px">
+        <img src="assets/illustrations/wallet_aym5.svg" alt="">
+        <h2>点单是空的，没什么好结算的</h2>
+        <p>先去点几道菜。</p>
+        <a class="btn btn-primary" href="menu.html">去点菜</a>
+      </div>`;
+    return;
+  }
+
+  let mode = 'dinein';   // dinein 堂食 / pickup 自取
+
+  /* 金额只算一遍，展示和下单都取这里的结果。
+     下单时要把这几项一起存进订单 —— 只存 items 的话，
+     订单详情页只能自己拿 subtotal×1.05 重算，自取优惠就丢了。 */
+  function amounts() {
+    const subtotal = SK.subtotal();
+    const serviceFee = 0;                       // 不收服务费（2026-10-17 定）
+    const discount = mode === 'pickup'          // 自提立减：2%，最多 4 元
+      ? Math.round(Math.min(4, subtotal * 0.02) * 100) / 100
+      : 0;
+    return { subtotal, serviceFee, discount, total: subtotal - discount };
+  }
+
+  function render() {
+    const { subtotal, serviceFee, discount, total } = amounts();
+
+    root.innerHTML = `
+      <div class="two-col">
+        <div>
+
+          <div class="panel">
+            <h2>${SK.ic('mdi:storefront-outline', 18)}就餐方式</h2>
+            <div class="choice-row" style="margin-bottom:18px">
+              <label class="choice">
+                <input type="radio" name="mode" value="dinein" ${mode === 'dinein' ? 'checked' : ''}>
+                <span>
+                  <span class="choice-title">堂食</span>
+                  <span class="choice-note">送到桌上，含餐位</span>
+                </span>
+              </label>
+              <label class="choice">
+                <input type="radio" name="mode" value="pickup" ${mode === 'pickup' ? 'checked' : ''}>
+                <span>
+                  <span class="choice-title">到店自取</span>
+                  <span class="choice-note">减 2%，打包带走</span>
+                </span>
+              </label>
+            </div>
+
+            <div id="table-block">
+              <div class="spec-label" style="font-size:var(--fs-sm);color:var(--ink-2);margin-bottom:8px;display:flex;align-items:center;gap:6px">
+                ${SK.ic('mdi:table-chair', 15)}桌号
+                <span style="color:var(--ink-3);font-weight:400">（每张桌子角上都贴着）</span>
+              </div>
+              <div class="spec-opts" id="table-opts">
+                ${SHOP.tables.map((t) => `
+                  <button class="spec-opt${t.id === SK.getTable() ? ' is-on' : ''}" type="button" data-table="${t.id}">
+                    ${t.id}<span class="opt-delta">${t.seats} 人 · ${t.area}</span>
+                  </button>`).join('')}
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h2>${SK.ic('mdi:account-group-outline', 18)}就餐人数</h2>
+            <div class="inline">
+              <div class="qty-box" style="height:38px">
+                <button type="button" id="p-dec" aria-label="减少人数">${SK.ic('mdi:minus', 15)}</button>
+                <span class="qty" id="p-val" style="min-width:36px;font-size:var(--fs-md)">2</span>
+                <button type="button" id="p-inc" aria-label="增加人数">${SK.ic('mdi:plus', 15)}</button>
+              </div>
+              <span style="color:var(--ink-2);font-size:var(--fs-sm)">人</span>
+              <span style="color:var(--ink-3);font-size:var(--fs-xs);margin-left:auto">用来配餐具，不影响价格</span>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h2>${SK.ic('mdi:message-text-outline', 18)}备注</h2>
+            <div class="field" style="margin-bottom:10px">
+              <label for="remark">口味、忌口、上菜顺序，都能写在这儿</label>
+              <textarea id="remark" placeholder="例如：麻婆豆腐少放花椒，饮品最后上"></textarea>
+            </div>
+            <div class="filter-chips">
+              ${['少放辣', '不要香菜', '不要葱', '饮品最后上', '打包盒多给一个', '先上凉菜']
+                .map((t) => `<button class="spec-opt" type="button" data-quick="${t}">+ ${t}</button>`).join('')}
+            </div>
+          </div>
+
+          <div class="panel" style="margin-bottom:0">
+            <h2>${SK.ic('mdi:wallet-outline', 18)}支付方式</h2>
+            <div class="choice-row">
+              <label class="choice">
+                <input type="radio" name="pay" value="微信支付" checked>
+                <span class="choice-title">微信支付</span>
+              </label>
+              <label class="choice">
+                <input type="radio" name="pay" value="支付宝">
+                <span class="choice-title">支付宝</span>
+              </label>
+              <label class="choice">
+                <input type="radio" name="pay" value="到店付现">
+                <span class="choice-title">到店付现</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <aside class="summary-card">
+          <h2>订 单 明 细</h2>
+          <div class="summary-body">
+            <div style="max-height:230px;overflow:auto;margin-bottom:12px">
+              ${SK.cart.lines.map((l) => {
+                const d = SK.dishById(l.dishId);
+                if (!d) return '';
+                const spec = d.specs[l.specIndex] || d.specs[0];
+                return `
+                <div class="summary-row">
+                  <span class="k">
+                    ${SK.esc(d.name)}
+                    <span style="color:var(--ink-3);font-size:var(--fs-xs)">
+                      ${SK.esc(spec?.name || '')} ×${l.qty}
+                    </span>
+                  </span>
+                  <span class="v">¥${SK.money(SK.unitPrice(l) * l.qty)}</span>
+                </div>`;
+              }).join('')}
+            </div>
+
+            <div class="summary-row" style="border-top:1px solid var(--line);padding-top:12px">
+              <span class="k">菜品小计</span><span class="v">¥${SK.money(subtotal)}</span>
+            </div>
+            ${serviceFee ? `<div class="summary-row"><span class="k">服务费</span><span class="v">¥${SK.money(serviceFee)}</span></div>` : ''}
+            ${discount ? `<div class="summary-row"><span class="k">自提立减（2%，最多 4 元）</span>
+              <span class="v" style="color:var(--jade)">−¥${SK.money(discount)}</span></div>` : ''}
+
+            <div class="summary-row is-total">
+              <span class="k">应 付</span><span class="v">¥${SK.money(total)}</span>
+            </div>
+
+            <button class="btn btn-primary btn-block btn-lg" id="submit" style="margin-top:16px">
+              ${SK.ic('mdi:check-circle', 19)}提交订单
+            </button>
+            <p style="font-size:var(--fs-xs);color:var(--ink-3);margin:11px 0 0;text-align:center">
+              点提交即表示确认菜品与桌号
+            </p>
+          </div>
+        </aside>
+      </div>`;
+
+    bind();
+  }
+
+  let people = 2;
+
+  function bind() {
+    root.querySelectorAll('input[name="mode"]').forEach((r) =>
+      r.addEventListener('change', () => { mode = r.value; render(); }));
+
+    root.querySelectorAll('[data-table]').forEach((b) =>
+      b.addEventListener('click', () => {
+        SK.setTable(b.dataset.table);
+        root.querySelectorAll('[data-table]').forEach((x) => x.classList.toggle('is-on', x === b));
+      }));
+
+    root.querySelector('#p-inc').addEventListener('click', () => {
+      people = Math.min(people + 1, 20);
+      root.querySelector('#p-val').textContent = people;
+    });
+    root.querySelector('#p-dec').addEventListener('click', () => {
+      people = Math.max(people - 1, 1);
+      root.querySelector('#p-val').textContent = people;
+    });
+
+    // 快捷备注：点了就往文本框里追加，不覆盖已经打的字
+    root.querySelectorAll('[data-quick]').forEach((b) =>
+      b.addEventListener('click', () => {
+        const ta = root.querySelector('#remark');
+        const add = b.dataset.quick;
+        ta.value = ta.value.includes(add) ? ta.value : (ta.value ? ta.value + '；' + add : add);
+        ta.focus();
+      }));
+
+    root.querySelector('#submit').addEventListener('click', submit);
+  }
+
+  function submit() {
+    const pay = root.querySelector('input[name="pay"]:checked').value;
+    const remark = root.querySelector('#remark').value.trim();
+    const no = 'SK' + new Date().toISOString().slice(0, 10).replace(/-/g, '') +
+      String(Math.floor(Math.random() * 900) + 100);
+
+    // 静态 Demo 没有后端，把订单存到 localStorage 给订单页读
+    const order = {
+      no,
+      time: new Date().toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-'),
+      table: SK.getTable(),
+      mode: mode === 'pickup' ? '到店自取' : '堂食',
+      people,
+      pay,
+      remark,
+      status: '已下单',
+      // 金额一起存下来。订单详情和最近订单都读它，不再自己重算。
+      ...amounts(),
+      items: SK.cart.lines.map((l) => ({ id: l.dishId, specIndex: l.specIndex, qty: l.qty }))
+    };
+
+    const all = JSON.parse(localStorage.getItem('sk_orders_v1') || '[]');
+    all.unshift(order);
+    localStorage.setItem('sk_orders_v1', JSON.stringify(all));
+
+    SK.clear();
+    location.href = 'order.html?no=' + encodeURIComponent(no) + '&new=1';
+  }
+
+  render();
+});
+</script>
+</body>
+</html>

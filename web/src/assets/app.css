@@ -1,0 +1,208 @@
+/* ==========================================================================
+   正式前端的补充样式。
+   style.css 是从 demo 直接拿过来的那一份（设计已确认，不要另起炉灶），
+   这里只放 demo 里没有、Vue 版本才需要的东西：
+     1. 骨架屏、加载态
+     2. Element Plus 的主题对齐
+     3. 几个布局外壳
+   ========================================================================== */
+
+/* ---------- 1. 加载与空态 ---------- */
+
+.sk-loading,
+.sk-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 56px 20px;
+  color: var(--ink-3);
+  text-align: center;
+}
+
+.sk-empty h3 {
+  margin: 0;
+  font-size: var(--fs-md);
+  color: var(--ink-2);
+}
+
+/* 骨架块。用渐变动画而不是逐条 loading 图标：
+   列表页加载时十来个占位块一起呼吸，比一个转圈更能说明"这里会出内容" */
+.sk-skeleton {
+  background: linear-gradient(90deg, var(--paper-2) 25%, var(--line-2) 37%, var(--paper-2) 63%);
+  background-size: 400% 100%;
+  animation: sk-breathe 1.4s ease infinite;
+  border-radius: var(--r-sm);
+}
+
+@keyframes sk-breathe {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sk-skeleton { animation: none; }
+}
+
+/* ---------- 2. Element Plus 主题对齐 ---------- */
+
+/* 把 Element Plus 的主色换成朱砂，圆角换成设计系统的值。
+   不覆盖的话，它的默认蓝 #409EFF 会在这个骨白/松墨绿/朱砂的页面里
+   显得像是从另一个网站抠下来的。 */
+:root {
+  --el-color-primary: var(--cinnabar);
+  --el-color-primary-light-3: #d4614f;
+  --el-color-primary-light-5: #e08a7c;
+  --el-color-primary-light-7: #ecb3a9;
+  --el-color-primary-light-8: #f2c8c0;
+  --el-color-primary-light-9: var(--cinnabar-soft);
+  --el-color-primary-dark-2: var(--cinnabar-dk);
+
+  --el-color-success: var(--jade);
+  --el-color-warning: var(--gold);
+  --el-color-danger: var(--cinnabar);
+  --el-color-info: var(--ink-3);
+
+  --el-text-color-primary: var(--ink);
+  --el-text-color-regular: var(--ink-2);
+  --el-text-color-secondary: var(--ink-3);
+  --el-border-color: var(--line);
+  --el-border-color-light: var(--line-2);
+  --el-fill-color-blank: var(--card);
+  --el-bg-color: var(--card);
+
+  --el-border-radius-base: var(--r-md);
+  --el-border-radius-small: var(--r-sm);
+  --el-font-family: var(--font-hei);
+}
+
+/* 输入框在骨白底上要有边界，否则会糊成一片 */
+.el-input__wrapper,
+.el-textarea__inner,
+.el-select__wrapper {
+  background-color: var(--card);
+}
+
+/* ---------- 3. 布局外壳 ---------- */
+
+/* 容器宽度对齐 demo 的 .wrap-wide：min(1440px, 100% - 40px)。
+   菜单页要三栏并排（分类竖栏 + 菜品 + 点单栏），窄了放不下；
+   其余页面用 .sk-narrow 自己收窄。 */
+.sk-main {
+  width: min(1440px, 100% - 40px);
+  margin: 0 auto;
+  padding: 22px 0 64px;
+}
+
+.sk-narrow { max-width: 900px; }
+.sk-center { max-width: 520px; margin: 0 auto; }
+
+.sk-page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.sk-page-head h1 {
+  margin: 0;
+  font-size: var(--fs-2xl);
+}
+
+.sk-page-head p {
+  margin: 4px 0 0;
+  color: var(--ink-3);
+}
+
+/* 两栏：主内容 + 侧栏。用于结算、个人中心这类没有分类栏的页面 */
+.sk-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--rail-w);
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .sk-split { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---------- 4. 通用卡片 ---------- */
+
+.sk-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 18px;
+  box-shadow: var(--shadow-1);
+}
+
+.sk-card + .sk-card { margin-top: 16px; }
+
+.sk-card > h2 {
+  margin: 0 0 12px;
+  font-size: var(--fs-md);
+}
+
+.sk-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sk-row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+/* 数字用等宽变体，避免刷新时数字宽度跳动 */
+.sk-num {
+  font-variant-numeric: tabular-nums;
+}
+
+.sk-price {
+  color: var(--cinnabar);
+  font-family: var(--font-song);
+  font-weight: 600;
+}
+
+/* ---------- 5. 状态标签 ---------- */
+
+.sk-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.sk-tag--signature { background: var(--cinnabar-soft); color: var(--cinnabar-dk); border-color: #eccfc9; }
+.sk-tag--veg       { background: var(--pine-soft);    color: #2F6349;         border-color: #cfdcd3; }
+.sk-tag--plain     { background: var(--paper-2);      color: var(--ink-2);    border-color: var(--line); }
+
+/* 售罄：整块降饱和，但文字仍然清晰可读（不是靠 opacity 变灰） */
+.sk-sold-out { position: relative; }
+.sk-sold-out .sk-dim { opacity: .45; }
+
+/* ---------- 6. 接到 demo 样式上的几处补充 ---------- */
+
+/* style.css 里 .cart-badge .badge 默认是 display:none，
+   原来的 demo 靠脚本写 textContent 来控制。Vue 这边用类名控制，
+   数量为 0 时角标不出现（而不是显示一个「0」） */
+.cart-badge .badge.is-on { display: inline-flex; }
+.cart-badge .badge:not(.is-on) { display: none; }
+
+/* Vue Router 的链接默认带下划线，demo 里是 <a> 无下划线 */
+a { text-decoration: none; color: inherit; }
+a:hover { text-decoration: none; }
+
+/* 顶栏搜索框在 Vue 里是 <form @submit.prevent>，
+   去掉浏览器给 form 的默认外边距 */
+.topbar-search { margin: 0; }

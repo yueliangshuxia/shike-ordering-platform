@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>后厨出单屏 · 食刻</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+  /* 后厨屏挂在墙上远距离看，所以整体反色、字号放大、信息层级别拉太细。
+     这一页不复用站点的浅色底，单独一套。 */
+  body.kds { background: #14201B; color: #F2F1EC; }
+  .kds-bar {
+    display: flex; align-items: center; gap: 20px;
+    padding: 14px 26px;
+    background: #0E1815;
+    border-bottom: 1px solid #2A3A33;
+    position: sticky; top: 0; z-index: 10;
+  }
+  .kds-bar h1 {
+    font-size: var(--fs-lg); letter-spacing: .18em; color: #F2F1EC;
+  }
+  .kds-bar .kds-clock {
+    font-size: var(--fs-2xl); font-variant-numeric: tabular-nums;
+    font-weight: 700; margin-left: auto; letter-spacing: .04em;
+  }
+  .kds-bar .kds-stat {
+    display: flex; align-items: center; gap: 7px;
+    font-size: var(--fs-sm); color: #8FA79B;
+    padding: 6px 13px; border: 1px solid #2A3A33; border-radius: 3px;
+  }
+  .kds-bar .kds-stat b { color: #F2F1EC; font-size: var(--fs-md); }
+
+  .kds-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+    gap: 16px;
+    padding: 22px 26px 40px;
+  }
+
+  .ticket {
+    background: #1C2B25;
+    border: 1px solid #2E4038;
+    border-top: 4px solid #4A5B54;
+    border-radius: 4px;
+    display: flex; flex-direction: column;
+  }
+  /* 等得越久边框越红，远看一眼就知道该先做哪张 */
+  .ticket.w-warn { border-top-color: #C08A2E; }
+  .ticket.w-late { border-top-color: #C4321F; background: #2A1C19; border-color: #5C322B; }
+
+  .ticket-head {
+    display: flex; align-items: baseline; gap: 11px;
+    padding: 12px 16px;
+    border-bottom: 1px dashed #33463D;
+  }
+  .ticket-head .t-table {
+    font-family: var(--font-song);
+    font-size: var(--fs-xl); font-weight: 700; letter-spacing: .06em;
+  }
+  .ticket-head .t-no {
+    font-size: var(--fs-xs); color: #8FA79B;
+    font-variant-numeric: tabular-nums;
+  }
+  .ticket-head .t-wait {
+    margin-left: auto;
+    font-size: var(--fs-lg); font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .ticket.w-warn .t-wait { color: #E0B45C; }
+  .ticket.w-late .t-wait { color: #E8705C; }
+
+  .ticket-items { padding: 8px 16px; flex: 1; }
+  .t-item {
+    display: flex; align-items: baseline; gap: 12px;
+    padding: 9px 0;
+    border-bottom: 1px solid #26362F;
+    font-size: var(--fs-md);
+  }
+  .t-item:last-child { border-bottom: 0; }
+  .t-item .t-qty {
+    font-weight: 700; color: #E0B45C;
+    font-variant-numeric: tabular-nums;
+    min-width: 34px;
+  }
+  .t-item .t-name { flex: 1; }
+
+  .ticket-foot {
+    display: flex; gap: 9px;
+    padding: 12px 16px;
+    border-top: 1px solid #2E4038;
+  }
+  .kds-btn {
+    flex: 1;
+    padding: 11px;
+    border: 1px solid #3E5A4E;
+    background: #22342C;
+    color: #F2F1EC;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: var(--fs-md);
+    transition: background .15s, border-color .15s;
+  }
+  .kds-btn:hover { background: #2C4438; border-color: #50735F; }
+  .kds-btn.is-primary { background: #C4321F; border-color: #C4321F; font-weight: 600; }
+  .kds-btn.is-primary:hover { background: #A32414; border-color: #A32414; }
+  .kds-btn.is-done { background: #1E4034; border-color: #3E7A5E; }
+
+  .t-status {
+    font-size: var(--fs-xs); letter-spacing: .1em;
+    padding: 3px 9px; border-radius: 3px;
+    background: #2E4038; color: #A8C0B4;
+  }
+  .kds-empty { grid-column: 1 / -1; text-align: center; padding: 70px 20px; color: #6E867A; }
+
+  /* 站点的提示条是深底浅字（--ink 底 / --rice 字），在这一页的深绿底上
+     实测对比度只有 1.07:1，等于什么都不显示。整条反过来。 */
+  body.kds .toast { background: #F2F1EC; color: #14201B; }
+  body.kds .toast .toast-icon { color: #1E4034; }
+</style>
+</head>
+<body class="kds">
+
+<div class="kds-bar">
+  <h1>后厨出单</h1>
+  <span class="kds-stat">待处理 <b id="k-open">0</b></span>
+  <span class="kds-stat">今日已出 <b id="k-done">—</b></span>
+  <span class="kds-stat">最长等待 <b id="k-max">0</b> 分</span>
+  <span class="kds-clock" id="k-clock">--:--:--</span>
+</div>
+
+<div class="kds-grid" id="kds"></div>
+
+<script src="assets/vendor/iconify-icon.min.js"></script>
+<script src="assets/icons/bundle.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  /* 队列拿的是页面里的静态数据加本地刚下的单。
+     真接后端时换成 WebSocket 推送，这一块的渲染逻辑不用动。 */
+  const mine = JSON.parse(localStorage.getItem('sk_orders_v1') || '[]')
+    .filter(o => o.status === '已下单')
+    .map(o => ({
+      no: o.no,
+      table: o.table,
+      waitMin: 1,
+      status: '待接单',
+      items: o.items.map(it => ({
+        name: SK.dishById(it.id)?.name || '未知菜品',
+        qty: it.qty
+      }))
+    }));
+
+  let queue = [...mine, ...KITCHEN_QUEUE.map(t => ({ ...t }))];
+
+  /* 交接班时报的今日已出单数。没有后端，这个数只活在当前会话里；
+     接了后端应该由服务端给当天累计值，本屏只负责往上加。 */
+  const DONE_BASE = 142;
+
+  function waitClass(m) {
+    if (m >= 15) return 'w-late';
+    if (m >= 8) return 'w-warn';
+    return '';
+  }
+
+  function render() {
+    const live = queue.filter(t => t.status !== '已出单');
+    const done = queue.filter(t => t.status === '已出单');
+
+    // 待处理 = 还没做好的；待上菜是已经出锅在等人端的，不算
+    document.getElementById('k-open').textContent =
+      live.filter(t => t.status !== '待上菜').length;
+
+    // 今日已出从交接班的基数往上加。以前是写死的 142，
+    // 这张屏出多少单它都不动，跟旁边的按钮完全脱节。
+    document.getElementById('k-done').textContent = DONE_BASE + done.length;
+
+    // 最长等待只看还没出单的。以前算的是整个队列，
+    // 单子全出完了「队列清空」下面还挂着个「最长等待 17 分」，自相矛盾。
+    document.getElementById('k-max').textContent =
+      live.length ? Math.max(...live.map(t => t.waitMin)) : 0;
+
+    if (!live.length) {
+      document.getElementById('kds').innerHTML = `
+        <div class="kds-empty">
+          <h2 style="color:#8FA79B;letter-spacing:.2em">队列清空</h2>
+          <p>当前没有待处理的单子。</p>
+          ${done.length ? `<p style="font-size:var(--fs-sm)">本轮已出 ${done.length} 单</p>` : ''}
+        </div>`;
+      return;
+    }
+
+    document.getElementById('kds').innerHTML = live.map(t => `
+      <article class="ticket ${waitClass(t.waitMin)}">
+        <div class="ticket-head">
+          <span class="t-table">${t.table} 桌</span>
+          <span class="t-no">${t.no}</span>
+          <span class="t-wait">${t.waitMin}′</span>
+        </div>
+        <div class="ticket-items">
+          ${t.items.map(i => `
+            <div class="t-item">
+              <span class="t-qty">×${i.qty}</span>
+              <span class="t-name">${SK.esc(i.name)}</span>
+            </div>`).join('')}
+        </div>
+        <div class="ticket-foot">
+          <span class="t-status">${t.status}</span>
+          ${t.status === '待接单' ? `
+            <button class="kds-btn is-primary" data-act="next" data-no="${t.no}">接单开工</button>
+          ` : t.status === '制作中' ? `
+            <button class="kds-btn is-primary" data-act="next" data-no="${t.no}">出餐</button>
+          ` : `
+            <button class="kds-btn is-done" data-act="next" data-no="${t.no}">已上菜</button>
+          `}
+        </div>
+      </article>`).join('');
+  }
+
+  const FLOW = { 待接单: '制作中', 制作中: '待上菜', 待上菜: '已出单' };
+
+  document.getElementById('kds').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-act="next"]');
+    if (!btn) return;
+    const t = queue.find(x => x.no === btn.dataset.no);
+    if (!t) return;
+    t.status = FLOW[t.status] || '已出单';
+    t.waitMin = Math.max(1, t.waitMin);
+    SK.toast(`${t.table} 桌 → ${t.status}`);
+    render();
+  });
+
+  // 等待时间每分钟涨一格
+  setInterval(() => {
+    queue.forEach(t => { if (t.status !== '已出单') t.waitMin += 1; });
+    render();
+  }, 60000);
+
+  function tick() {
+    const d = new Date();
+    document.getElementById('k-clock').textContent =
+      [d.getHours(), d.getMinutes(), d.getSeconds()]
+        .map(n => String(n).padStart(2, '0')).join(':');
+  }
+  tick();
+  setInterval(tick, 1000);
+
+  render();
+});
+</script>
+</body>
+</html>
